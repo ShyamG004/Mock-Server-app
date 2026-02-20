@@ -151,6 +151,14 @@ router.post('/authorize/login', (req, res) => {
 
   // Validate user credentials
   if (username !== basicCreds.username || password !== basicCreds.password) {
+    // For form submission, redirect back with error
+    if (req.headers['content-type']?.includes('application/x-www-form-urlencoded')) {
+      const loginUrl = new URL('/oauth1-login.html', `${req.protocol}://${req.get('host')}`);
+      loginUrl.searchParams.set('oauth_token', oauth_token || '');
+      if (oauth_callback) loginUrl.searchParams.set('oauth_callback', oauth_callback);
+      loginUrl.searchParams.set('error', 'Invalid username or password');
+      return res.redirect(loginUrl.toString());
+    }
     return res.status(401).json({
       status: 'failure',
       message: 'Invalid username or password'
@@ -182,13 +190,27 @@ router.post('/authorize/login', (req, res) => {
   tokenData.authorized = true;
   tokenData.userId = username;
 
-  // Return response with callback URL for redirect
+  // If callback exists, redirect directly (like Tumblr does)
+  if (finalCallback && finalCallback !== 'oob') {
+    try {
+      const callbackUrl = new URL(finalCallback);
+      callbackUrl.searchParams.set('oauth_token', oauth_token);
+      callbackUrl.searchParams.set('oauth_verifier', verifier);
+      return res.redirect(callbackUrl.toString());
+    } catch (e) {
+      // If URL parsing fails, append params manually
+      const separator = finalCallback.includes('?') ? '&' : '?';
+      return res.redirect(`${finalCallback}${separator}oauth_token=${encodeURIComponent(oauth_token)}&oauth_verifier=${encodeURIComponent(verifier)}`);
+    }
+  }
+
+  // No callback (oob flow) - return JSON with verifier
   res.json({
     status: 'success',
     message: 'Authorization successful',
     oauth_token,
     oauth_verifier: verifier,
-    oauth_callback: finalCallback || null
+    oauth_callback: null
   });
 });
 

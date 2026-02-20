@@ -345,13 +345,17 @@
         </ul>
       </div>
 
-      <form class="login-form" id="loginForm">
+      <form class="login-form" id="loginForm" method="POST" action="/oauth1/authorize/login">
         <div class="credentials-hint">
           <strong>🧪 Test Credentials:</strong>
           Username: <code>testuser</code> | Password: <code>testpass123</code>
         </div>
 
         <div class="error-message" id="errorMessage"></div>
+
+        <!-- Hidden fields for OAuth params -->
+        <input type="hidden" name="oauth_token" id="oauth_token_field" value="">
+        <input type="hidden" name="oauth_callback" id="oauth_callback_field" value="">
 
         <div class="form-group">
           <label for="username">Username</label>
@@ -368,11 +372,6 @@
           <button type="submit" class="btn btn-primary">Authorize</button>
         </div>
       </form>
-
-      <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <p>Authorizing...</p>
-      </div>
     </div>
 
     <div id="noTokenError" class="no-token-error" style="display: none;">
@@ -391,6 +390,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const oauthToken = urlParams.get('oauth_token');
     const oauthCallback = urlParams.get('oauth_callback');
+    const errorParam = urlParams.get('error');
 
     // Initialize page
     document.addEventListener('DOMContentLoaded', () => {
@@ -398,6 +398,12 @@
         document.getElementById('mainContent').style.display = 'none';
         document.getElementById('noTokenError').style.display = 'block';
         return;
+      }
+
+      // Set hidden form fields
+      document.getElementById('oauth_token_field').value = oauthToken;
+      if (oauthCallback) {
+        document.getElementById('oauth_callback_field').value = oauthCallback;
       }
 
       // Display token (truncated)
@@ -410,130 +416,35 @@
       document.getElementById('appName').textContent = 'OAuth 1.0 Client';
       document.getElementById('appUrl').textContent = oauthCallback || 'No callback specified';
       document.getElementById('appIcon').textContent = 'O';
-    });
 
-    // Handle form submission
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      const errorMessage = document.getElementById('errorMessage');
-      const loginForm = document.getElementById('loginForm');
-      const loading = document.getElementById('loading');
-
-      // Hide error
-      errorMessage.classList.remove('show');
-
-      // Show loading
-      loginForm.style.display = 'none';
-      loading.classList.add('show');
-
-      try {
-        // Validate credentials and authorize token
-        const authResponse = await fetch('/oauth1/authorize/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            username,
-            password,
-            oauth_token: oauthToken,
-            oauth_callback: oauthCallback
-          })
-        });
-
-        const result = await authResponse.json();
-
-        if (authResponse.ok && result.status === 'success') {
-          // Get callback from response (server might have it from request-token step)
-          const finalCallback = result.oauth_callback || oauthCallback;
-
-          // Redirect with verifier
-          if (finalCallback && finalCallback !== 'oob') {
-            // Build callback URL with oauth_token and oauth_verifier
-            let redirectUrl;
-            try {
-              // Handle relative and absolute URLs
-              if (finalCallback.startsWith('http://') || finalCallback.startsWith('https://')) {
-                redirectUrl = new URL(finalCallback);
-              } else {
-                redirectUrl = new URL(finalCallback, window.location.origin);
-              }
-              redirectUrl.searchParams.set('oauth_token', oauthToken);
-              redirectUrl.searchParams.set('oauth_verifier', result.oauth_verifier);
-
-              // Redirect immediately - the application will handle the rest
-              window.location.href = redirectUrl.toString();
-              return; // Stop execution
-            } catch (urlError) {
-              console.error('URL parsing error:', urlError);
-              // If URL parsing fails, try direct redirect
-              const separator = finalCallback.includes('?') ? '&' : '?';
-              window.location.href = `${finalCallback}${separator}oauth_token=${encodeURIComponent(oauthToken)}&oauth_verifier=${encodeURIComponent(result.oauth_verifier)}`;
-              return; // Stop execution
-            }
-          } else {
-            // No callback (oob flow) - show verifier for manual entry
-            loading.classList.remove('show');
-            loginForm.innerHTML = `
-              <div style="text-align: center; padding: 20px;">
-                <h3 style="color: #38a169; margin-bottom: 15px;">✅ Authorization Successful!</h3>
-                <p style="margin-bottom: 10px;">Your verification code:</p>
-                <code style="background: #edf2f7; padding: 10px 20px; border-radius: 8px; font-size: 18px; display: block; word-break: break-all; user-select: all; cursor: pointer;" onclick="copyToClipboard(this)" title="Click to copy">
-                  ${result.oauth_verifier}
-                </code>
-                <p style="margin-top: 15px; font-size: 13px; color: #718096;">
-                  Copy this code and paste it in your application to complete authorization.
-                </p>
-                <button onclick="window.close()" style="margin-top: 20px; padding: 10px 30px; background: #38a169; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
-                  Close Window
-                </button>
-              </div>
-            `;
-            loginForm.style.display = 'block';
-          }
-        } else {
-          // Show error
-          loading.classList.remove('show');
-          loginForm.style.display = 'block';
-          errorMessage.textContent = result.message || 'Authentication failed';
-          errorMessage.classList.add('show');
-        }
-      } catch (error) {
-        loading.classList.remove('show');
-        loginForm.style.display = 'block';
-        errorMessage.textContent = 'Connection error. Please try again.';
+      // Show error if redirected back with error
+      if (errorParam) {
+        const errorMessage = document.getElementById('errorMessage');
+        errorMessage.textContent = decodeURIComponent(errorParam);
         errorMessage.classList.add('show');
       }
     });
 
-    // Copy to clipboard helper
-    function copyToClipboard(element) {
-      const text = element.textContent.trim();
-      navigator.clipboard.writeText(text).then(() => {
-        const originalText = element.innerHTML;
-        element.innerHTML = '✅ Copied!';
-        setTimeout(() => {
-          element.innerHTML = originalText;
-        }, 2000);
-      });
-    }
-
     // Handle deny
     function handleDeny() {
-      if (oauthCallback) {
-        const callbackUrl = new URL(oauthCallback);
-        callbackUrl.searchParams.set('oauth_problem', 'user_refused');
-        window.location.href = callbackUrl.toString();
+      if (oauthCallback && oauthCallback !== 'oob') {
+        try {
+          const callbackUrl = new URL(oauthCallback);
+          callbackUrl.searchParams.set('oauth_problem', 'user_refused');
+          window.location.href = callbackUrl.toString();
+        } catch (e) {
+          const separator = oauthCallback.includes('?') ? '&' : '?';
+          window.location.href = `${oauthCallback}${separator}oauth_problem=user_refused`;
+        }
       } else {
-        window.close();
-        // If window.close doesn't work, show message
+        // No callback - just show denied message
         document.getElementById('mainContent').innerHTML = `
           <div style="text-align: center; padding: 40px;">
             <h3 style="color: #c53030;">❌ Authorization Denied</h3>
             <p style="color: #718096; margin-top: 10px;">You have denied the authorization request.</p>
+            <button onclick="window.close()" style="margin-top: 20px; padding: 10px 30px; background: #718096; color: white; border: none; border-radius: 8px; cursor: pointer;">
+              Close Window
+            </button>
           </div>
         `;
       }
