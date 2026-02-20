@@ -1,0 +1,34 @@
+# Render deployment configuration
+# This file tells Render how to build and deploy the application
+
+services:
+  - type: web
+    name: mock-auth-server
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: LOG_LEVEL
+        value: info
+      - key: ADMIN_ENABLED
+        value: true
+      - key: ADMIN_API_KEY
+        generateValue: true
+      - key: MOCK_CLIENT_ID
+        value: test_client_id
+      - key: MOCK_CLIENT_SECRET
+        generateValue: true
+      - key: MOCK_API_KEY
+        generateValue: true
+      - key: MOCK_USERNAME
+        value: testuser
+      - key: MOCK_PASSWORD
+        generateValue: true
+

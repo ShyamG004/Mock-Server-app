@@ -1,0 +1,76 @@
+# Default Authentication Configuration
+authType: OAuth2
+grantType: Authorization Code
+configurationType: Auto
+clientAuthMethod: Client Secret Basic
+scopeDelimiter: space
+paramLocation: header
+totalParams: 50
+dynamicParams: 10
+totalScopes: 50
+
+# Credentials Configuration
+credentials:
+  apiKey:
+    keys:
+      - name: X-API-Key
+        value: test_api_key_12345
+        location: header
+      - name: X-API-Secret
+        value: test_api_secret_67890
+        location: header
+
+  basic:
+    username: testuser
+    password: testpass123
+
+  oauth1:
+    consumerKey: mock_consumer_key
+    consumerSecret: mock_consumer_secret
+    tokenKey: mock_token_key
+    tokenSecret: mock_token_secret
+
+  oauth2:
+    clientId: test_client_id
+    clientSecret: test_client_secret
+    redirectUri: http://localhost:3000/callback
+    authorizationUrl: /authorize
+    tokenUrl: /token
+
+# Validation Settings
+validation:
+  requireAllParams: true
+  validateDynamicParams: true
+  strictScopeValidation: true
+
+# Dynamic Parameter Definitions
+dynamicParamDefinitions:
+  - name: timestamp
+    type: timestamp
+    format: unix
+  - name: nonce
+    type: nonce
+    length: 32
+  - name: request_id
+    type: uuid
+    format: v4
+  - name: session_id
+    type: uuid
+    format: v4
+  - name: correlation_id
+    type: uuid
+    format: v4
+
+# Available Scopes
+scopes:
+  - read
+  - write
+  - delete
+  - admin
+  - profile
+  - email
+  - openid
+  - offline_access
+  - api:read
+  - api:write
+

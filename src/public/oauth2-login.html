@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In - Mock Auth Server</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+    }
+
+    .login-header {
+      background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .login-header h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .login-header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .app-info {
+      background: #f7fafc;
+      padding: 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .app-info h3 {
+      font-size: 14px;
+      color: #718096;
+      margin-bottom: 10px;
+    }
+
+    .app-details {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .app-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .app-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .app-url {
+      font-size: 12px;
+      color: #718096;
+    }
+
+    .scopes-section {
+      padding: 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .scopes-section h3 {
+      font-size: 14px;
+      color: #718096;
+      margin-bottom: 12px;
+    }
+
+    .scope-list {
+      list-style: none;
+    }
+
+    .scope-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      color: #4a5568;
+      font-size: 14px;
+    }
+
+    .scope-icon {
+      width: 24px;
+      height: 24px;
+      background: #ebf8ff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #3182ce;
+      font-size: 12px;
+    }
+
+    .login-form {
+      padding: 25px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #4a5568;
+      margin-bottom: 8px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-group input::placeholder {
+      color: #a0aec0;
+    }
+
+    .error-message {
+      background: #fff5f5;
+      color: #c53030;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .error-message.show {
+      display: block;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #4a5568;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e0;
+    }
+
+    .login-footer {
+      padding: 20px;
+      background: #f7fafc;
+      text-align: center;
+      font-size: 12px;
+      color: #718096;
+    }
+
+    .login-footer a {
+      color: #667eea;
+      text-decoration: none;
+    }
+
+    .credentials-hint {
+      background: #fffbeb;
+      border: 1px solid #f6e05e;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #744210;
+    }
+
+    .credentials-hint strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .loading.show {
+      display: block;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #e2e8f0;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h1>🔐 Sign In</h1>
+      <p>Mock Authentication Server</p>
+    </div>
+
+    <div class="app-info">
+      <h3>Application requesting access:</h3>
+      <div class="app-details">
+        <div class="app-icon" id="appIcon">A</div>
+        <div>
+          <div class="app-name" id="appName">Application</div>
+          <div class="app-url" id="appUrl">-</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scopes-section" id="scopesSection">
+      <h3>This application will be able to:</h3>
+      <ul class="scope-list" id="scopeList">
+        <!-- Scopes will be populated dynamically -->
+      </ul>
+    </div>
+
+    <form class="login-form" id="loginForm">
+      <div class="credentials-hint">
+        <strong>🧪 Test Credentials:</strong>
+        Username: <code>testuser</code> | Password: <code>testpass123</code>
+      </div>
+
+      <div class="error-message" id="errorMessage"></div>
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" placeholder="Enter your username" required autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+      </div>
+
+      <div class="btn-group">
+        <button type="button" class="btn btn-secondary" onclick="handleDeny()">Deny</button>
+        <button type="submit" class="btn btn-primary">Authorize</button>
+      </div>
+    </form>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>Authorizing...</p>
+    </div>
+
+    <div class="login-footer">
+      By authorizing, you agree to share the requested information.<br>
+      <a href="/api-docs" target="_blank">API Documentation</a>
+    </div>
+  </div>
+
+  <script>
+    // Parse URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const clientId = urlParams.get('client_id');
+    const redirectUri = urlParams.get('redirect_uri');
+    const scope = urlParams.get('scope');
+    const state = urlParams.get('state');
+    const responseType = urlParams.get('response_type');
+    const codeChallenge = urlParams.get('code_challenge');
+    const codeChallengeMethod = urlParams.get('code_challenge_method');
+    const scopeDelimiter = urlParams.get('scope_delimiter') || 'space';
+    const authEndpoint = urlParams.get('auth_endpoint') || '/oauth2/authorize/callback';
+
+    // Scope descriptions
+    const scopeDescriptions = {
+      'read': '📖 Read your data',
+      'write': '✏️ Modify your data',
+      'delete': '🗑️ Delete your data',
+      'admin': '👑 Full administrative access',
+      'profile': '👤 Access your profile information',
+      'email': '📧 Access your email address',
+      'openid': '🔑 Verify your identity',
+      'offline_access': '🔄 Access data when you\'re not using the app'
+    };
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set app info
+      document.getElementById('appName').textContent = clientId || 'Unknown Application';
+      document.getElementById('appUrl').textContent = redirectUri || 'No redirect URI';
+      document.getElementById('appIcon').textContent = (clientId || 'A').charAt(0).toUpperCase();
+
+      // Parse and display scopes
+      if (scope) {
+        let delimiter = ' ';
+        if (scopeDelimiter === 'comma') delimiter = ',';
+        else if (scopeDelimiter === 'plus') delimiter = '+';
+
+        const scopes = scope.split(delimiter).filter(s => s.trim());
+        const scopeList = document.getElementById('scopeList');
+        scopeList.innerHTML = '';
+
+        scopes.forEach(s => {
+          const li = document.createElement('li');
+          li.className = 'scope-item';
+          const desc = scopeDescriptions[s.trim()] || `🔹 ${s.trim()}`;
+          li.innerHTML = `<span class="scope-icon">✓</span> ${desc}`;
+          scopeList.appendChild(li);
+        });
+      } else {
+        document.getElementById('scopesSection').style.display = 'none';
+      }
+    });
+
+    // Handle form submission
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorMessage = document.getElementById('errorMessage');
+      const loginForm = document.getElementById('loginForm');
+      const loading = document.getElementById('loading');
+
+      // Hide error
+      errorMessage.classList.remove('show');
+
+      // Show loading
+      loginForm.style.display = 'none';
+      loading.classList.add('show');
+
+      try {
+        // Validate credentials
+        const authResponse = await fetch('/oauth2/authorize/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            username,
+            password,
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            scope,
+            state,
+            response_type: responseType,
+            code_challenge: codeChallenge,
+            code_challenge_method: codeChallengeMethod,
+            scope_delimiter: scopeDelimiter
+          })
+        });
+
+        const result = await authResponse.json();
+
+        if (authResponse.ok && result.status === 'success') {
+          // Redirect with authorization code
+          const redirectUrl = new URL(redirectUri);
+          redirectUrl.searchParams.set('code', result.code);
+          if (state) redirectUrl.searchParams.set('state', state);
+
+          window.location.href = redirectUrl.toString();
+        } else {
+          // Show error
+          loading.classList.remove('show');
+          loginForm.style.display = 'block';
+          errorMessage.textContent = result.message || 'Authentication failed';
+          errorMessage.classList.add('show');
+        }
+      } catch (error) {
+        loading.classList.remove('show');
+        loginForm.style.display = 'block';
+        errorMessage.textContent = 'Connection error. Please try again.';
+        errorMessage.classList.add('show');
+      }
+    });
+
+    // Handle deny
+    function handleDeny() {
+      if (redirectUri) {
+        const redirectUrl = new URL(redirectUri);
+        redirectUrl.searchParams.set('error', 'access_denied');
+        redirectUrl.searchParams.set('error_description', 'User denied the authorization request');
+        if (state) redirectUrl.searchParams.set('state', state);
+        window.location.href = redirectUrl.toString();
+      } else {
+        window.close();
+      }
+    }
+  </script>
+</body>
+</html>
+

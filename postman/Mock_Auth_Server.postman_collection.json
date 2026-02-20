@@ -1,0 +1,1332 @@
+{
+  "info": {
+    "name": "Mock Auth Server",
+    "_postman_id": "mock-auth-server-collection",
+    "description": "Comprehensive test collection for Mock Authentication Server with STRICT endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "test_client_id",
+      "type": "string"
+    },
+    {
+      "key": "clientSecret",
+      "value": "test_client_secret",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "test_api_key_12345",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "testuser",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "testpass123",
+      "type": "string"
+    },
+    {
+      "key": "consumerKey",
+      "value": "mock_consumer_key",
+      "type": "string"
+    },
+    {
+      "key": "consumerSecret",
+      "value": "mock_consumer_secret",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "authCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "oauth1_request_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "oauth1_verifier",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "oauth1_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "pkceAuthCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "clientJWT",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Config",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          }
+        },
+        {
+          "name": "Get Current Config",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/config"
+          }
+        },
+        {
+          "name": "Get Test Credentials",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/config/credentials"
+          }
+        }
+      ]
+    },
+    {
+      "name": "API Key - STRICT Endpoints",
+      "description": "Each endpoint accepts API key in ONE specific location only",
+      "item": [
+        {
+          "name": "Header ONLY (/api-key/header)",
+          "item": [
+            {
+              "name": "✅ Valid - API Key in Header",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api-key/header",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "❌ Error - API Key in Query (not allowed)",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api-key/header?X-API-Key={{apiKey}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query ONLY (/api-key/query)",
+          "item": [
+            {
+              "name": "✅ Valid - API Key in Query",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api-key/query?X-API-Key={{apiKey}}"
+              }
+            },
+            {
+              "name": "❌ Error - API Key in Header (not allowed)",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api-key/query",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Body ONLY (/api-key/body)",
+          "item": [
+            {
+              "name": "✅ Valid - API Key in JSON Body",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api-key/body",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"X-API-Key\": \"{{apiKey}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ Error - API Key in Header (not allowed)",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api-key/body",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Form Data ONLY (/api-key/form)",
+          "item": [
+            {
+              "name": "✅ Valid - API Key in Form Data",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api-key/form",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "X-API-Key",
+                      "value": "{{apiKey}}",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "❌ Error - API Key in Header (not allowed)",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api-key/form",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": []
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auto-detect (/api-key/test)",
+          "item": [
+            {
+              "name": "Auto - Header",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api-key/test",
+                "header": [
+                  {
+                    "key": "X-API-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Auto - Query",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api-key/test?X-API-Key={{apiKey}}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Basic Auth - Header Authentication",
+      "description": "Basic Authentication ONLY supports Authorization header (not body)",
+      "item": [
+        {
+          "name": "Header Auth (/basic/header)",
+          "item": [
+            {
+              "name": "✅ Valid - Credentials in Header",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/basic/header",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{username}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{password}}"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "❌ Error - Missing Auth Header",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/basic/header"
+              }
+            },
+            {
+              "name": "❌ Error - Invalid Credentials",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/basic/header",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "wrong_user"
+                    },
+                    {
+                      "key": "password",
+                      "value": "wrong_pass"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Test Endpoints (/basic/test)",
+          "item": [
+            {
+              "name": "Test Basic Auth",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/basic/test",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{username}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{password}}"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Test with Additional Params",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/basic/test-params",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{username}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{password}}"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"param1\": \"value1\",\n  \"timestamp\": \"1234567890\"\n}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OAuth 1.0",
+      "description": "OAuth 1.0 requires Authorization header for all endpoints",
+      "item": [
+        {
+          "name": "Step 1 - Get Request Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const timestamp = Math.floor(Date.now() / 1000);",
+                  "const nonce = pm.variables.replaceIn('{{$randomUUID}}').replace(/-/g, '');",
+                  "pm.variables.set('oauth_timestamp', timestamp);",
+                  "pm.variables.set('oauth_nonce', nonce);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.details && jsonData.details.oauth_token) {",
+                  "    pm.collectionVariables.set('oauth1_request_token', jsonData.details.oauth_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/oauth1/request-token",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{consumerKey}}\", oauth_nonce=\"{{oauth_nonce}}\", oauth_timestamp=\"{{oauth_timestamp}}\", oauth_signature_method=\"HMAC-SHA1\", oauth_signature=\"mock_signature\", oauth_version=\"1.0\""
+              }
+            ]
+          }
+        },
+        {
+          "name": "Step 2 - Authorize",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.details && jsonData.details.oauth_verifier) {",
+                  "    pm.collectionVariables.set('oauth1_verifier', jsonData.details.oauth_verifier);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/oauth1/authorize?oauth_token={{oauth1_request_token}}"
+          }
+        },
+        {
+          "name": "Step 3 - Get Access Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const timestamp = Math.floor(Date.now() / 1000);",
+                  "const nonce = pm.variables.replaceIn('{{$randomUUID}}').replace(/-/g, '');",
+                  "pm.variables.set('oauth_timestamp', timestamp);",
+                  "pm.variables.set('oauth_nonce', nonce);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.details && jsonData.details.oauth_token) {",
+                  "    pm.collectionVariables.set('oauth1_access_token', jsonData.details.oauth_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/oauth1/access-token",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{consumerKey}}\", oauth_token=\"{{oauth1_request_token}}\", oauth_verifier=\"{{oauth1_verifier}}\", oauth_nonce=\"{{oauth_nonce}}\", oauth_timestamp=\"{{oauth_timestamp}}\", oauth_signature_method=\"HMAC-SHA1\", oauth_signature=\"mock_signature\", oauth_version=\"1.0\""
+              }
+            ]
+          }
+        },
+        {
+          "name": "Step 4 - Test Protected Resource",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const timestamp = Math.floor(Date.now() / 1000);",
+                  "const nonce = pm.variables.replaceIn('{{$randomUUID}}').replace(/-/g, '');",
+                  "pm.variables.set('oauth_timestamp', timestamp);",
+                  "pm.variables.set('oauth_nonce', nonce);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/oauth1/test",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{consumerKey}}\", oauth_token=\"{{oauth1_access_token}}\", oauth_nonce=\"{{oauth_nonce}}\", oauth_timestamp=\"{{oauth_timestamp}}\", oauth_signature_method=\"HMAC-SHA1\", oauth_signature=\"mock_signature\", oauth_version=\"1.0\""
+              }
+            ]
+          }
+        },
+        {
+          "name": "Echo OAuth1 Request (Debug)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const timestamp = Math.floor(Date.now() / 1000);",
+                  "pm.variables.set('oauth_timestamp', timestamp);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/oauth1/echo",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{consumerKey}}\", oauth_nonce=\"test_nonce_12345\", oauth_timestamp=\"{{oauth_timestamp}}\", oauth_signature_method=\"HMAC-SHA1\", oauth_signature=\"test_sig\", oauth_version=\"1.0\""
+              }
+            ]
+          }
+        },
+        {
+          "name": "❌ Error - Missing Auth Header",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/oauth1/test"
+          }
+        },
+        {
+          "name": "❌ Error - Invalid Consumer Key",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const timestamp = Math.floor(Date.now() / 1000);",
+                  "pm.variables.set('oauth_timestamp', timestamp);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/oauth1/test",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"wrong_key\", oauth_nonce=\"test123nonce\", oauth_timestamp=\"{{oauth_timestamp}}\", oauth_signature_method=\"HMAC-SHA1\", oauth_signature=\"mock_sig\", oauth_version=\"1.0\""
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "OAuth 2.0 - STRICT Endpoints",
+      "description": "Each token endpoint accepts credentials in ONE specific method only",
+      "item": [
+        {
+          "name": "Basic Auth ONLY (/token/basic)",
+          "item": [
+            {
+              "name": "✅ Valid - Client Credentials via Basic Auth",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = pm.response.json();",
+                      "if (jsonData.access_token) {",
+                      "    pm.collectionVariables.set('accessToken', jsonData.access_token);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/basic",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{clientSecret}}"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "read write"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "❌ Error - Credentials in Body (not allowed)",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/basic",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials"
+                    },
+                    {
+                      "key": "client_id",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "client_secret",
+                      "value": "{{clientSecret}}"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Post Body ONLY (/token/post)",
+          "item": [
+            {
+              "name": "✅ Valid - Client Credentials via Post Body",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = pm.response.json();",
+                      "if (jsonData.access_token) {",
+                      "    pm.collectionVariables.set('accessToken', jsonData.access_token);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/post",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials"
+                    },
+                    {
+                      "key": "client_id",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "client_secret",
+                      "value": "{{clientSecret}}"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "read,write"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "❌ Error - Credentials in Header (not allowed)",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/post",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{clientSecret}}"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "JWT ONLY (/token/jwt)",
+          "item": [
+            {
+              "name": "✅ Valid - Client Credentials via JWT",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      "const header = { alg: 'HS256', typ: 'JWT' };",
+                      "const payload = {",
+                      "    iss: pm.collectionVariables.get('clientId'),",
+                      "    sub: pm.collectionVariables.get('clientId'),",
+                      "    exp: Math.floor(Date.now() / 1000) + 300,",
+                      "    iat: Math.floor(Date.now() / 1000)",
+                      "};",
+                      "",
+                      "const base64Header = btoa(JSON.stringify(header));",
+                      "const base64Payload = btoa(JSON.stringify(payload));",
+                      "const mockSignature = 'mock_signature_for_testing';",
+                      "",
+                      "const jwt = base64Header + '.' + base64Payload + '.' + mockSignature;",
+                      "pm.variables.set('clientJWT', jwt);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = pm.response.json();",
+                      "if (jsonData.access_token) {",
+                      "    pm.collectionVariables.set('accessToken', jsonData.access_token);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/jwt",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials"
+                    },
+                    {
+                      "key": "client_assertion_type",
+                      "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+                    },
+                    {
+                      "key": "client_assertion",
+                      "value": "{{clientJWT}}"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "read write"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "❌ Error - Basic Auth Header (not allowed)",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/jwt",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{clientSecret}}"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "PKCE ONLY (/token/pkce)",
+          "item": [
+            {
+              "name": "Step 1 - Get Auth Code with PKCE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = pm.response.json();",
+                      "if (jsonData.details && jsonData.details.code) {",
+                      "    pm.collectionVariables.set('pkceAuthCode', jsonData.details.code);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/authorize?response_type=code&client_id={{clientId}}&redirect_uri=http://localhost:3000/callback&scope=read&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&state=pkce_test"
+              }
+            },
+            {
+              "name": "✅ Valid - Exchange Code with Verifier",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = pm.response.json();",
+                      "if (jsonData.access_token) {",
+                      "    pm.collectionVariables.set('accessToken', jsonData.access_token);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/pkce",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "authorization_code"
+                    },
+                    {
+                      "key": "code",
+                      "value": "{{pkceAuthCode}}"
+                    },
+                    {
+                      "key": "redirect_uri",
+                      "value": "http://localhost:3000/callback"
+                    },
+                    {
+                      "key": "client_id",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "code_verifier",
+                      "value": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "❌ Error - With client_secret (not allowed)",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/pkce",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "authorization_code"
+                    },
+                    {
+                      "key": "client_id",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "client_secret",
+                      "value": "{{clientSecret}}"
+                    },
+                    {
+                      "key": "code_verifier",
+                      "value": "test"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auto-detect (/token)",
+          "item": [
+            {
+              "name": "Auto - Basic Auth",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{clientSecret}}"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "read"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Auto - Post Body",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials"
+                    },
+                    {
+                      "key": "client_id",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "client_secret",
+                      "value": "{{clientSecret}}"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "read"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Authorization Code Flow",
+          "item": [
+            {
+              "name": "Step 1 - Get Authorization Code (comma scopes)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = pm.response.json();",
+                      "if (jsonData.details && jsonData.details.code) {",
+                      "    pm.collectionVariables.set('authCode', jsonData.details.code);",
+                      "    console.log('Auth code saved: ' + jsonData.details.code);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/authorize?response_type=code&client_id={{clientId}}&redirect_uri=http://localhost:3000/callback&scope=read,write,profile&state=test_state"
+              }
+            },
+            {
+              "name": "Step 2 - Exchange Code for Token (Basic Auth)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = pm.response.json();",
+                      "if (jsonData.access_token) {",
+                      "    pm.collectionVariables.set('accessToken', jsonData.access_token);",
+                      "    console.log('Access token saved');",
+                      "}",
+                      "if (jsonData.refresh_token) {",
+                      "    pm.collectionVariables.set('refreshToken', jsonData.refresh_token);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/basic",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{clientSecret}}"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "authorization_code"
+                    },
+                    {
+                      "key": "code",
+                      "value": "{{authCode}}"
+                    },
+                    {
+                      "key": "redirect_uri",
+                      "value": "http://localhost:3000/callback"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Step 3 - Test Access Token",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/oauth2/test",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Step 4 - Refresh Token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = pm.response.json();",
+                      "if (jsonData.access_token) {",
+                      "    pm.collectionVariables.set('accessToken', jsonData.access_token);",
+                      "}",
+                      "if (jsonData.refresh_token) {",
+                      "    pm.collectionVariables.set('refreshToken', jsonData.refresh_token);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/token/basic",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{clientSecret}}"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "refresh_token"
+                    },
+                    {
+                      "key": "refresh_token",
+                      "value": "{{refreshToken}}"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token Management",
+          "item": [
+            {
+              "name": "Token Introspection",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/oauth2/introspect",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{clientSecret}}"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Token Revocation",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/oauth2/revoke",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "{{clientId}}"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{clientSecret}}"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Protected Endpoints",
+      "item": [
+        {
+          "name": "Protected - Bearer Token",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/protected",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Protected - API Key",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/protected",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Echo Request",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/protected/echo",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"test\": \"data\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

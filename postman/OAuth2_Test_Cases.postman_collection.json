@@ -1,0 +1,460 @@
+{
+  "info": {
+    "name": "OAuth2 Strict Endpoints Test Cases",
+    "_postman_id": "oauth2-strict-endpoints",
+    "description": "Test collection for OAuth2 STRICT endpoints with dedicated URLs for each configuration:\n\nEndpoint Pattern:\n- /oauth2/{grantType}/{clientAuth}/{scopeDelimiter}/token\n- /oauth2/{grantType}/{clientAuth}/{scopeDelimiter}/test/header\n- /oauth2/{grantType}/{clientAuth}/{scopeDelimiter}/test/query\n\nGrant Types: auth-code, auth-code-pkce, client-creds\nClient Auth: basic, post, jwt, none (PKCE only)\nScope Delimiter: comma, space, plus\nToken Placement: header, query",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:3000", "type": "string"},
+    {"key": "clientId", "value": "test_client_id", "type": "string"},
+    {"key": "clientSecret", "value": "test_client_secret", "type": "string"},
+    {"key": "redirectUri", "value": "http://localhost:3000/callback", "type": "string"},
+    {"key": "authCode", "value": "", "type": "string"},
+    {"key": "accessToken", "value": "", "type": "string"},
+    {"key": "codeVerifier", "value": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk", "type": "string"},
+    {"key": "codeChallenge", "value": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", "type": "string"}
+  ],
+  "item": [
+    {
+      "name": "0. List All Endpoints",
+      "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/endpoints"}
+    },
+    {
+      "name": "0.1 Redirect URI Management",
+      "description": "CRUD operations for managing redirect URIs",
+      "item": [
+        {
+          "name": "List Redirect URIs",
+          "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/redirect-uris"}
+        },
+        {
+          "name": "Add Redirect URI",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/oauth2/redirect-uris",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"redirect_uri\": \"https://myapp.com/callback\"\n}"}
+          }
+        },
+        {
+          "name": "Update Redirect URI",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/oauth2/redirect-uris",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"old_redirect_uri\": \"https://myapp.com/callback\",\n  \"new_redirect_uri\": \"https://myapp.com/oauth/callback\"\n}"}
+          }
+        },
+        {
+          "name": "Delete Redirect URI",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/oauth2/redirect-uris",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"redirect_uri\": \"https://myapp.com/oauth/callback\"\n}"}
+          }
+        },
+        {
+          "name": "Reset Redirect URIs to Defaults",
+          "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/redirect-uris/reset"}
+        },
+        {
+          "name": "❌ Error - Unregistered Redirect URI",
+          "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri=https://unknown.com/callback&scope=read,write&state=test"}
+        }
+      ]
+    },
+    {
+      "name": "0.2 Scope Management",
+      "description": "CRUD operations for managing scopes",
+      "item": [
+        {
+          "name": "List Scopes",
+          "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/scopes"}
+        },
+        {
+          "name": "Add Scope",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/oauth2/scopes",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"scope\": \"custom_scope\"\n}"}
+          }
+        },
+        {
+          "name": "Add Scopes (Bulk)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/oauth2/scopes/bulk",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"scopes\": [\"scope1\", \"scope2\", \"scope3\"]\n}"}
+          }
+        },
+        {
+          "name": "Update Scope",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/oauth2/scopes",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"old_scope\": \"custom_scope\",\n  \"new_scope\": \"updated_scope\"\n}"}
+          }
+        },
+        {
+          "name": "Delete Scope",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/oauth2/scopes",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"scope\": \"updated_scope\"\n}"}
+          }
+        },
+        {
+          "name": "Reset Scopes to Defaults",
+          "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/scopes/reset"}
+        },
+        {
+          "name": "Disable Strict Scope Validation",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/oauth2/scopes/validation",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"strict\": false\n}"}
+          }
+        },
+        {
+          "name": "Enable Strict Scope Validation",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/oauth2/scopes/validation",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"strict\": true\n}"}
+          }
+        },
+        {
+          "name": "❌ Error - Unregistered Scope",
+          "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=unknown_scope&state=test"}
+        }
+      ]
+    },
+    {
+      "name": "1. Authorization Code + Basic Auth",
+      "item": [
+        {
+          "name": "1.1 Scope: Comma",
+          "item": [
+            {"name": "Step 1 - Authorize (API Mode)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read,write,profile&state=test&skip_login=true"}},
+            {"name": "Step 1 - Authorize (Login UI)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read,write,profile&state=test"}, "description": "Opens login UI in browser"},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/basic/comma/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/basic/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/basic/comma/test/query?access_token={{accessToken}}"}},
+            {"name": "❌ Wrong Delimiter (space)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read write profile"}},
+            {"name": "❌ Token in Wrong Place (Query on Header endpoint)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/basic/comma/test/header?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "1.2 Scope: Space",
+          "item": [
+            {"name": "Step 1 - Authorize", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/space/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read write profile&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/basic/space/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/basic/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/basic/space/test/query?access_token={{accessToken}}"}},
+            {"name": "❌ Wrong Delimiter (comma)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/space/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read,write,profile"}}
+          ]
+        },
+        {
+          "name": "1.3 Scope: Plus",
+          "item": [
+            {"name": "Step 1 - Authorize", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/plus/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read+write+profile&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/basic/plus/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/basic/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/basic/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Authorization Code + Post Auth",
+      "item": [
+        {
+          "name": "2.1 Scope: Comma",
+          "item": [
+            {"name": "Step 1 - Authorize", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read,write,profile&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/post/comma/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/post/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/post/comma/test/query?access_token={{accessToken}}"}},
+            {"name": "❌ Wrong Auth (Basic header on Post endpoint)", "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/post/comma/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}]}}}
+          ]
+        },
+        {
+          "name": "2.2 Scope: Space",
+          "item": [
+            {"name": "Step 1 - Authorize", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/space/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read write profile&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/post/space/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/post/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/post/space/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "2.3 Scope: Plus",
+          "item": [
+            {"name": "Step 1 - Authorize", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/plus/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read+write+profile&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/post/plus/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/post/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/post/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Authorization Code + JWT Auth",
+      "item": [
+        {
+          "name": "3.1 Scope: Comma",
+          "item": [
+            {"name": "Step 1 - Authorize", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read,write,profile&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "prerequest", "script": {"exec": ["const jwt = btoa('{\"alg\":\"HS256\",\"typ\":\"JWT\"}') + '.' + btoa('{\"iss\":\"' + pm.collectionVariables.get('clientId') + '\",\"sub\":\"' + pm.collectionVariables.get('clientId') + '\",\"exp\":' + (Math.floor(Date.now()/1000)+300) + '}') + '.mock_sig';", "pm.variables.set('clientJWT', jwt);"]}}, {"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/jwt/comma/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_assertion_type", "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}, {"key": "client_assertion", "value": "{{clientJWT}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/jwt/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/jwt/comma/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "3.2 Scope: Space",
+          "item": [
+            {"name": "Step 1 - Authorize", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/space/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read write profile&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "prerequest", "script": {"exec": ["const jwt = btoa('{\"alg\":\"HS256\",\"typ\":\"JWT\"}') + '.' + btoa('{\"iss\":\"' + pm.collectionVariables.get('clientId') + '\",\"sub\":\"' + pm.collectionVariables.get('clientId') + '\"}') + '.mock_sig';", "pm.variables.set('clientJWT', jwt);"]}}, {"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/jwt/space/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_assertion_type", "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}, {"key": "client_assertion", "value": "{{clientJWT}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/jwt/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/jwt/space/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "3.3 Scope: Plus",
+          "item": [
+            {"name": "Step 1 - Authorize", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/plus/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read+write+profile&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "prerequest", "script": {"exec": ["const jwt = btoa('{\"alg\":\"HS256\",\"typ\":\"JWT\"}') + '.' + btoa('{\"iss\":\"' + pm.collectionVariables.get('clientId') + '\",\"sub\":\"' + pm.collectionVariables.get('clientId') + '\"}') + '.mock_sig';", "pm.variables.set('clientJWT', jwt);"]}}, {"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code/jwt/plus/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_assertion_type", "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}, {"key": "client_assertion", "value": "{{clientJWT}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/jwt/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code/jwt/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Auth Code PKCE + Basic Auth",
+      "item": [
+        {
+          "name": "4.1 Scope: Comma",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read,write,profile&code_challenge={{codeChallenge}}&code_challenge_method=S256&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/basic/comma/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/basic/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/basic/comma/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "4.2 Scope: Space",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/space/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read write profile&code_challenge={{codeChallenge}}&code_challenge_method=S256&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/basic/space/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/basic/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/basic/space/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "4.3 Scope: Plus",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/plus/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read+write+profile&code_challenge={{codeChallenge}}&code_challenge_method=S256&state=test"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/basic/plus/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/basic/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/basic/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Auth Code PKCE + Post Auth",
+      "item": [
+        {
+          "name": "5.1 Scope: Comma",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read,write,profile&code_challenge={{codeChallenge}}&code_challenge_method=S256"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/post/comma/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/post/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/post/comma/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "5.2 Scope: Space",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/space/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read write profile&code_challenge={{codeChallenge}}&code_challenge_method=S256"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/post/space/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/post/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/post/space/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "5.3 Scope: Plus",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/plus/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read+write+profile&code_challenge={{codeChallenge}}&code_challenge_method=S256"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/post/plus/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/post/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/post/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Auth Code PKCE + JWT Auth",
+      "item": [
+        {
+          "name": "6.1 Scope: Comma",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read,write,profile&code_challenge={{codeChallenge}}&code_challenge_method=S256"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "prerequest", "script": {"exec": ["const jwt = btoa('{\"alg\":\"HS256\"}') + '.' + btoa('{\"iss\":\"' + pm.collectionVariables.get('clientId') + '\",\"sub\":\"' + pm.collectionVariables.get('clientId') + '\"}') + '.sig';", "pm.variables.set('clientJWT', jwt);"]}}, {"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/jwt/comma/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_assertion_type", "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}, {"key": "client_assertion", "value": "{{clientJWT}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/jwt/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/jwt/comma/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "6.2 Scope: Space",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/space/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read write profile&code_challenge={{codeChallenge}}&code_challenge_method=S256"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "prerequest", "script": {"exec": ["const jwt = btoa('{\"alg\":\"HS256\"}') + '.' + btoa('{\"iss\":\"' + pm.collectionVariables.get('clientId') + '\",\"sub\":\"' + pm.collectionVariables.get('clientId') + '\"}') + '.sig';", "pm.variables.set('clientJWT', jwt);"]}}, {"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/jwt/space/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_assertion_type", "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}, {"key": "client_assertion", "value": "{{clientJWT}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/jwt/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/jwt/space/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "6.3 Scope: Plus",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/plus/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read+write+profile&code_challenge={{codeChallenge}}&code_challenge_method=S256"}},
+            {"name": "Step 2 - Token", "event": [{"listen": "prerequest", "script": {"exec": ["const jwt = btoa('{\"alg\":\"HS256\"}') + '.' + btoa('{\"iss\":\"' + pm.collectionVariables.get('clientId') + '\",\"sub\":\"' + pm.collectionVariables.get('clientId') + '\"}') + '.sig';", "pm.variables.set('clientJWT', jwt);"]}}, {"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/jwt/plus/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_assertion_type", "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}, {"key": "client_assertion", "value": "{{clientJWT}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/jwt/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/jwt/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Auth Code PKCE + None (Public Client)",
+      "item": [
+        {
+          "name": "7.1 Scope: Comma",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/comma/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read,write,profile&code_challenge={{codeChallenge}}&code_challenge_method=S256"}},
+            {"name": "Step 2 - Token (PKCE Only)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/comma/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/comma/test/query?access_token={{accessToken}}"}},
+            {"name": "❌ Error - With client_secret", "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/comma/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "test"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}}
+          ]
+        },
+        {
+          "name": "7.2 Scope: Space",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/space/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read write profile&code_challenge={{codeChallenge}}&code_challenge_method=S256"}},
+            {"name": "Step 2 - Token (PKCE Only)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/space/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/space/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "7.3 Scope: Plus",
+          "item": [
+            {"name": "Step 1 - Authorize (PKCE)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.details && jsonData.details.code) { pm.collectionVariables.set('authCode', jsonData.details.code); }"]}}], "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/plus/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&scope=read+write+profile&code_challenge={{codeChallenge}}&code_challenge_method=S256"}},
+            {"name": "Step 2 - Token (PKCE Only)", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/plus/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "authorization_code"}, {"key": "code", "value": "{{authCode}}"}, {"key": "redirect_uri", "value": "{{redirectUri}}"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "code_verifier", "value": "{{codeVerifier}}"}]}}},
+            {"name": "Step 3 - Test (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Step 3 - Test (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/auth-code-pkce/none/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Client Credentials + Basic Auth",
+      "item": [
+        {
+          "name": "8.1 Scope: Comma",
+          "item": [
+            {"name": "Get Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/basic/comma/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "scope", "value": "read,write,profile"}]}}},
+            {"name": "Test Token (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/basic/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Test Token (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/basic/comma/test/query?access_token={{accessToken}}"}},
+            {"name": "❌ Wrong Scope Delimiter (space)", "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/basic/comma/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "scope", "value": "read write profile"}]}}},
+            {"name": "❌ Wrong Auth (Post on Basic)", "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/basic/comma/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}, {"key": "scope", "value": "read,write"}]}}}
+          ]
+        },
+        {
+          "name": "8.2 Scope: Space",
+          "item": [
+            {"name": "Get Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/basic/space/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "scope", "value": "read write profile"}]}}},
+            {"name": "Test Token (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/basic/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Test Token (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/basic/space/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "8.3 Scope: Plus",
+          "item": [
+            {"name": "Get Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/basic/plus/token", "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{clientId}}"}, {"key": "password", "value": "{{clientSecret}}"}]}, "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "scope", "value": "read+write+profile"}]}}},
+            {"name": "Test Token (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/basic/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Test Token (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/basic/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9. Client Credentials + Post Auth",
+      "item": [
+        {
+          "name": "9.1 Scope: Comma",
+          "item": [
+            {"name": "Get Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/post/comma/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}, {"key": "scope", "value": "read,write,profile"}]}}},
+            {"name": "Test Token (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/post/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Test Token (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/post/comma/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "9.2 Scope: Space",
+          "item": [
+            {"name": "Get Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/post/space/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}, {"key": "scope", "value": "read write profile"}]}}},
+            {"name": "Test Token (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/post/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Test Token (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/post/space/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "9.3 Scope: Plus",
+          "item": [
+            {"name": "Get Token", "event": [{"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/post/plus/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "client_id", "value": "{{clientId}}"}, {"key": "client_secret", "value": "{{clientSecret}}"}, {"key": "scope", "value": "read+write+profile"}]}}},
+            {"name": "Test Token (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/post/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Test Token (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/post/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10. Client Credentials + JWT Auth",
+      "item": [
+        {
+          "name": "10.1 Scope: Comma",
+          "item": [
+            {"name": "Get Token", "event": [{"listen": "prerequest", "script": {"exec": ["const jwt = btoa('{\"alg\":\"HS256\"}') + '.' + btoa('{\"iss\":\"' + pm.collectionVariables.get('clientId') + '\",\"sub\":\"' + pm.collectionVariables.get('clientId') + '\"}') + '.sig';", "pm.variables.set('clientJWT', jwt);"]}}, {"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/jwt/comma/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "client_assertion_type", "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}, {"key": "client_assertion", "value": "{{clientJWT}}"}, {"key": "scope", "value": "read,write,profile"}]}}},
+            {"name": "Test Token (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/jwt/comma/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Test Token (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/jwt/comma/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "10.2 Scope: Space",
+          "item": [
+            {"name": "Get Token", "event": [{"listen": "prerequest", "script": {"exec": ["const jwt = btoa('{\"alg\":\"HS256\"}') + '.' + btoa('{\"iss\":\"' + pm.collectionVariables.get('clientId') + '\",\"sub\":\"' + pm.collectionVariables.get('clientId') + '\"}') + '.sig';", "pm.variables.set('clientJWT', jwt);"]}}, {"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/jwt/space/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "client_assertion_type", "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}, {"key": "client_assertion", "value": "{{clientJWT}}"}, {"key": "scope", "value": "read write profile"}]}}},
+            {"name": "Test Token (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/jwt/space/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Test Token (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/jwt/space/test/query?access_token={{accessToken}}"}}
+          ]
+        },
+        {
+          "name": "10.3 Scope: Plus",
+          "item": [
+            {"name": "Get Token", "event": [{"listen": "prerequest", "script": {"exec": ["const jwt = btoa('{\"alg\":\"HS256\"}') + '.' + btoa('{\"iss\":\"' + pm.collectionVariables.get('clientId') + '\",\"sub\":\"' + pm.collectionVariables.get('clientId') + '\"}') + '.sig';", "pm.variables.set('clientJWT', jwt);"]}}, {"listen": "test", "script": {"exec": ["var jsonData = pm.response.json();", "if (jsonData.access_token) { pm.collectionVariables.set('accessToken', jsonData.access_token); }"]}}], "request": {"method": "POST", "url": "{{baseUrl}}/oauth2/client-creds/jwt/plus/token", "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}], "body": {"mode": "urlencoded", "urlencoded": [{"key": "grant_type", "value": "client_credentials"}, {"key": "client_assertion_type", "value": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"}, {"key": "client_assertion", "value": "{{clientJWT}}"}, {"key": "scope", "value": "read+write+profile"}]}}},
+            {"name": "Test Token (Header)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/jwt/plus/test/header", "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}]}},
+            {"name": "Test Token (Query)", "request": {"method": "GET", "url": "{{baseUrl}}/oauth2/client-creds/jwt/plus/test/query?access_token={{accessToken}}"}}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "authType": "OAuth2",
+  "grantType": "Authorization Code",
+  "configurationType": "Auto",
+  "clientAuthMethod": "Client Secret Basic",
+  "scopeDelimiter": "comma",
+  "paramLocation": "header",
+  "totalParams": 50,
+  "dynamicParams": 10,
+  "totalScopes": 50,
+  "credentials": {
+    "apiKey": {
+      "keys": [
+        {
+          "name": "X-API-Key",
+          "value": "test_api_key_12345",
+          "location": "header"
+        }
+      ]
+    },
+    "basic": {
+      "username": "testuser",
+      "password": "testpass123"
+    },
+    "oauth1": {
+      "consumerKey": "mock_consumer_key",
+      "consumerSecret": "mock_consumer_secret",
+      "tokenKey": "mock_token_key",
+      "tokenSecret": "mock_token_secret"
+    },
+    "oauth2": {
+      "clientId": "test_client_id",
+      "clientSecret": "test_client_secret",
+      "redirectUri": "http://localhost:3000/callback",
+      "authorizationUrl": "/authorize",
+      "tokenUrl": "/token"
+    }
+  },
+  "validation": {
+    "requireAllParams": true,
+    "validateDynamicParams": true,
+    "strictScopeValidation": true
+  },
+  "dynamicParamDefinitions": [
+    {
+      "name": "timestamp",
+      "type": "timestamp",
+      "format": "unix"
+    },
+    {
+      "name": "nonce",
+      "type": "nonce",
+      "length": 32
+    },
+    {
+      "name": "request_id",
+      "type": "uuid",
+      "format": "v4"
+    }
+  ],
+  "scopes": [
+    "read",
+    "write",
+    "delete",
+    "admin",
+    "profile",
+    "email",
+    "openid",
+    "offline_access"
+  ]
+}
+
