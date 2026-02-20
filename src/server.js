@@ -56,8 +56,12 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
+      formAction: ["'self'", "*"],  // Allow form submissions to any URL
+      frameAncestors: ["*"],  // Allow being embedded in iframes
     },
   },
+  crossOriginOpenerPolicy: false,  // Allow popups to communicate
+  crossOriginEmbedderPolicy: false,  // Allow cross-origin resources
 }));
 
 // CORS configuration

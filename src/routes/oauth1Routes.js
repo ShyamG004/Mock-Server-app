@@ -193,8 +193,12 @@ router.post('/authorize/submit', (req, res) => {
   if (finalCallback && finalCallback !== 'oob') {
     const separator = finalCallback.indexOf('?') >= 0 ? '&' : '?';
     const redirectUrl = `${finalCallback}${separator}oauth_token=${encodeURIComponent(oauth_token)}&oauth_verifier=${encodeURIComponent(verifier)}`;
-    logger.info('Redirecting to callback', { redirectUrl: redirectUrl.substring(0, 100) + '...' });
-    return res.redirect(redirectUrl);
+    logger.info('Sending 302 redirect to callback', { redirectUrl });
+
+    // Use explicit 302 redirect
+    res.writeHead(302, { 'Location': redirectUrl });
+    res.end();
+    return;
   }
 
   // No callback - show verifier code (OOB flow)
