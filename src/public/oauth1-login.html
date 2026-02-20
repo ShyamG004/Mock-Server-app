@@ -345,7 +345,7 @@
         </ul>
       </div>
 
-      <form class="login-form" id="loginForm" method="POST" action="/oauth1/authorize/login">
+      <form class="login-form" id="loginForm" method="POST" action="/oauth1/authorize/login" onsubmit="return validateAndSubmit()">
         <div class="credentials-hint">
           <strong>🧪 Test Credentials:</strong>
           Username: <code>testuser</code> | Password: <code>testpass123</code>
@@ -353,20 +353,9 @@
 
         <div class="error-message" id="errorMessage"></div>
 
-        <!-- Hidden fields for OAuth params - values set by inline script below -->
-        <input type="hidden" name="oauth_token" id="oauth_token_field">
-        <input type="hidden" name="oauth_callback" id="oauth_callback_field">
-
-        <script>
-          // Set hidden field values immediately from URL params
-          (function() {
-            var params = new URLSearchParams(window.location.search);
-            var tokenField = document.getElementById('oauth_token_field');
-            var callbackField = document.getElementById('oauth_callback_field');
-            if (tokenField) tokenField.value = params.get('oauth_token') || '';
-            if (callbackField) callbackField.value = params.get('oauth_callback') || '';
-          })();
-        </script>
+        <!-- Hidden fields for OAuth params -->
+        <input type="hidden" name="oauth_token" id="oauth_token_field" value="">
+        <input type="hidden" name="oauth_callback" id="oauth_callback_field" value="">
 
         <div class="form-group">
           <label for="username">Username</label>
@@ -398,13 +387,17 @@
 
   <script>
     // Parse URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const oauthToken = urlParams.get('oauth_token');
-    const oauthCallback = urlParams.get('oauth_callback');
-    const errorParam = urlParams.get('error');
+    var urlParams = new URLSearchParams(window.location.search);
+    var oauthToken = urlParams.get('oauth_token') || '';
+    var oauthCallback = urlParams.get('oauth_callback') || '';
+    var errorParam = urlParams.get('error');
 
-    // Initialize page on DOM ready
-    document.addEventListener('DOMContentLoaded', function() {
+    // Set hidden fields on page load
+    window.onload = function() {
+      // Set hidden form fields
+      document.getElementById('oauth_token_field').value = oauthToken;
+      document.getElementById('oauth_callback_field').value = oauthCallback;
+
       var mainContent = document.getElementById('mainContent');
       var noTokenError = document.getElementById('noTokenError');
 
@@ -431,7 +424,22 @@
         errorMessage.textContent = decodeURIComponent(errorParam);
         errorMessage.classList.add('show');
       }
-    });
+    };
+
+    // Validate and submit form
+    function validateAndSubmit() {
+      // Ensure hidden fields are set
+      document.getElementById('oauth_token_field').value = oauthToken;
+      document.getElementById('oauth_callback_field').value = oauthCallback;
+
+      console.log('Form submitting...');
+      console.log('oauth_token:', document.getElementById('oauth_token_field').value);
+      console.log('oauth_callback:', document.getElementById('oauth_callback_field').value);
+      console.log('username:', document.getElementById('username').value);
+
+      // Return true to allow form submission
+      return true;
+    }
 
     // Handle deny button
     function handleDeny() {
@@ -441,7 +449,7 @@
           callbackUrl.searchParams.set('oauth_problem', 'user_refused');
           window.location.href = callbackUrl.toString();
         } catch (e) {
-          var separator = oauthCallback.includes('?') ? '&' : '?';
+          var separator = oauthCallback.indexOf('?') !== -1 ? '&' : '?';
           window.location.href = oauthCallback + separator + 'oauth_problem=user_refused';
         }
       } else {
