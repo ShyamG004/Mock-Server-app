@@ -565,26 +565,86 @@ function isValidRedirectUri(uri) {
 
 /**
  * Validate redirect URI is registered - STRICT
+ * Handles:
+ * - Exact match
+ * - Port variations (:443 for https, :80 for http)
+ * - Query parameters (allows extra params like ?state=xxx)
  */
 function validateRedirectUri(uri) {
   if (!uri) {
     return { valid: false, error: 'Missing redirect_uri parameter' };
   }
 
-  if (!redirectUriStore.uris.has(uri)) {
-    return {
-      valid: false,
-      error: 'Unregistered redirect_uri',
-      details: {
-        provided: uri,
-        hint: 'Register this URI first via POST /oauth2/redirect-uris',
-        registeredUris: Array.from(redirectUriStore.uris)
-      }
-    };
+  // Check exact match first
+  if (redirectUriStore.uris.has(uri)) {
+    return { valid: true };
   }
 
-  return { valid: true };
+  // Handle special OAuth OOB URI
+  if (uri === 'urn:ietf:wg:oauth:2.0:oob') {
+    return { valid: true };
+  }
+
+  // Parse the provided URI to compare base URL
+  try {
+    const providedUri = new URL(uri);
+
+    // Normalize: remove default ports
+    let normalizedProvided = `${providedUri.protocol}//${providedUri.hostname}`;
+    if (providedUri.port &&
+        !(providedUri.protocol === 'https:' && providedUri.port === '443') &&
+        !(providedUri.protocol === 'http:' && providedUri.port === '80')) {
+      normalizedProvided += `:${providedUri.port}`;
+    }
+    normalizedProvided += providedUri.pathname;
+
+    // Check against each registered redirect URI
+    for (const registeredUri of redirectUriStore.uris) {
+      if (registeredUri === 'urn:ietf:wg:oauth:2.0:oob') continue;
+
+      try {
+        const registered = new URL(registeredUri);
+
+        // Normalize registered URI
+        let normalizedRegistered = `${registered.protocol}//${registered.hostname}`;
+        if (registered.port &&
+            !(registered.protocol === 'https:' && registered.port === '443') &&
+            !(registered.protocol === 'http:' && registered.port === '80')) {
+          normalizedRegistered += `:${registered.port}`;
+        }
+        normalizedRegistered += registered.pathname;
+
+        // Compare normalized URIs (ignoring query params)
+        if (normalizedProvided === normalizedRegistered) {
+          return { valid: true };
+        }
+      } catch (e) {
+        // If registered URI can't be parsed, try string comparison
+        if (uri.startsWith(registeredUri)) {
+          return { valid: true };
+        }
+      }
+    }
+  } catch (e) {
+    // If URI parsing fails, fall back to prefix matching
+    for (const registeredUri of redirectUriStore.uris) {
+      if (registeredUri !== 'urn:ietf:wg:oauth:2.0:oob' && uri.startsWith(registeredUri)) {
+        return { valid: true };
+      }
+    }
+  }
+
+  return {
+    valid: false,
+    error: 'Unregistered redirect_uri',
+    details: {
+      provided: uri,
+      hint: 'Register this URI first via POST /oauth2/redirect-uris',
+      registeredUris: Array.from(redirectUriStore.uris)
+    }
+  };
 }
+
 
 /**
  * Validate scopes are registered - STRICT (when enabled)

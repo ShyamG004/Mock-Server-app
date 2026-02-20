@@ -25,176 +25,6 @@ const tokenStore = {
 };
 
 // =============================================================================
-// CALLBACK URL STORE (OAuth1)
-// =============================================================================
-const callbackStore = {
-  urls: new Set([
-    'http://localhost:3000/callback',
-    'http://localhost:8080/callback',
-    'http://127.0.0.1:3000/callback',
-    'https://oauth.pstmn.io/v1/callback',
-    'oob',
-    'https://shyam-nts0023.csez.zohocorpin.com/applicationOauthRedirect'
-  ]),
-  strictValidation: true
-};
-
-/**
- * Validate callback URL is registered
- */
-function validateCallbackUrl(url) {
-  if (!callbackStore.strictValidation) return { valid: true };
-  if (!url || url === 'oob') return { valid: true };
-
-  if (!callbackStore.urls.has(url)) {
-    return {
-      valid: false,
-      error: 'Unregistered oauth_callback',
-      details: {
-        provided: url,
-        hint: 'Register this callback via POST /oauth1/callbacks',
-        registeredCallbacks: Array.from(callbackStore.urls)
-      }
-    };
-  }
-  return { valid: true };
-}
-
-// =============================================================================
-// CALLBACK URL CRUD ENDPOINTS
-// =============================================================================
-
-/**
- * GET /oauth1/callbacks - List all registered callback URLs
- */
-router.get('/callbacks', (req, res) => {
-  res.json({
-    status: 'success',
-    message: 'Registered OAuth1 callback URLs',
-    data: {
-      callbacks: Array.from(callbackStore.urls),
-      count: callbackStore.urls.size,
-      strictValidation: callbackStore.strictValidation
-    }
-  });
-});
-
-/**
- * POST /oauth1/callbacks - Add a new callback URL
- */
-router.post('/callbacks', (req, res) => {
-  const { callback_url } = req.body;
-
-  if (!callback_url) {
-    return res.status(400).json({
-      status: 'failure',
-      message: 'Missing callback_url in request body',
-      hint: 'Send { "callback_url": "https://example.com/callback" }'
-    });
-  }
-
-  if (callbackStore.urls.has(callback_url)) {
-    return res.status(409).json({
-      status: 'failure',
-      message: 'Callback URL already exists',
-      data: { callback_url }
-    });
-  }
-
-  callbackStore.urls.add(callback_url);
-
-  res.status(201).json({
-    status: 'success',
-    message: 'Callback URL added successfully',
-    data: {
-      callback_url,
-      totalCallbacks: callbackStore.urls.size
-    }
-  });
-});
-
-/**
- * DELETE /oauth1/callbacks - Remove a callback URL
- */
-router.delete('/callbacks', (req, res) => {
-  const { callback_url } = req.body;
-
-  if (!callback_url) {
-    return res.status(400).json({
-      status: 'failure',
-      message: 'Missing callback_url in request body'
-    });
-  }
-
-  if (!callbackStore.urls.has(callback_url)) {
-    return res.status(404).json({
-      status: 'failure',
-      message: 'Callback URL not found',
-      data: { callback_url }
-    });
-  }
-
-  callbackStore.urls.delete(callback_url);
-
-  res.json({
-    status: 'success',
-    message: 'Callback URL removed successfully',
-    data: {
-      callback_url,
-      totalCallbacks: callbackStore.urls.size
-    }
-  });
-});
-
-/**
- * POST /oauth1/callbacks/reset - Reset to default callback URLs
- */
-router.post('/callbacks/reset', (req, res) => {
-  callbackStore.urls.clear();
-  callbackStore.urls.add('http://localhost:3000/callback');
-  callbackStore.urls.add('http://localhost:8080/callback');
-  callbackStore.urls.add('http://127.0.0.1:3000/callback');
-  callbackStore.urls.add('https://oauth.pstmn.io/v1/callback');
-  callbackStore.urls.add('oob');
-  callbackStore.urls.add('https://shyam-nts0023.csez.zohocorpin.com/applicationOauthRedirect');
-
-  res.json({
-    status: 'success',
-    message: 'Callback URLs reset to defaults',
-    data: {
-      callbacks: Array.from(callbackStore.urls),
-      count: callbackStore.urls.size
-    }
-  });
-});
-
-/**
- * PUT /oauth1/callbacks/validation - Toggle strict callback validation
- */
-router.put('/callbacks/validation', (req, res) => {
-  const { strict } = req.body;
-
-  if (typeof strict !== 'boolean') {
-    return res.status(400).json({
-      status: 'failure',
-      message: 'Missing or invalid strict value',
-      hint: 'Send { "strict": true } or { "strict": false }'
-    });
-  }
-
-  callbackStore.strictValidation = strict;
-
-  res.json({
-    status: 'success',
-    message: `Strict callback validation ${strict ? 'enabled' : 'disabled'}`,
-    data: {
-      strictValidation: callbackStore.strictValidation,
-      registeredCallbacks: Array.from(callbackStore.urls)
-    }
-  });
-});
-
-// =============================================================================
 // OAuth1 FLOW ENDPOINTS (All require Authorization header)
 // =============================================================================
 
@@ -215,19 +45,7 @@ router.post('/request-token', validateOAuth1Signature, (req, res) => {
   // Get oauth_callback from OAuth params (from Authorization header)
   const oauthCallback = req.oauth1Params.oauth_callback || req.body.oauth_callback || req.query.oauth_callback;
 
-  // Validate callback URL if provided
-  if (oauthCallback && oauthCallback !== 'oob') {
-    const callbackResult = validateCallbackUrl(oauthCallback);
-    if (!callbackResult.valid) {
-      return res.status(400).json({
-        status: 'failure',
-        message: callbackResult.error,
-        details: callbackResult.details
-      });
-    }
-  }
-
-  // Store request token with callback
+  // Store request token with callback (NO validation - accept any callback)
   tokenStore.requestTokens.set(requestToken, {
     secret: requestTokenSecret,
     created: Date.now(),
@@ -279,18 +97,6 @@ router.get('/authorize', (req, res) => {
     oauth_callback = tokenData.callback;
   }
 
-  // Validate callback URL if provided
-  if (oauth_callback && oauth_callback !== 'oob') {
-    const callbackResult = validateCallbackUrl(oauth_callback);
-    if (!callbackResult.valid) {
-      return res.status(400).json({
-        status: 'failure',
-        message: callbackResult.error,
-        details: callbackResult.details
-      });
-    }
-  }
-
   // Skip login mode for API testing
   if (skip_login === 'true') {
     const verifier = generateToken('ver');
@@ -298,10 +104,16 @@ router.get('/authorize', (req, res) => {
     tokenData.authorized = true;
 
     if (oauth_callback && oauth_callback !== 'oob') {
-      const callbackUrl = new URL(oauth_callback);
-      callbackUrl.searchParams.set('oauth_token', oauth_token);
-      callbackUrl.searchParams.set('oauth_verifier', verifier);
-      return res.redirect(callbackUrl.toString());
+      try {
+        const callbackUrl = new URL(oauth_callback);
+        callbackUrl.searchParams.set('oauth_token', oauth_token);
+        callbackUrl.searchParams.set('oauth_verifier', verifier);
+        return res.redirect(callbackUrl.toString());
+      } catch (e) {
+        // If URL parsing fails, append params manually
+        const separator = oauth_callback.includes('?') ? '&' : '?';
+        return res.redirect(`${oauth_callback}${separator}oauth_token=${encodeURIComponent(oauth_token)}&oauth_verifier=${encodeURIComponent(verifier)}`);
+      }
     }
 
     return res.json({
