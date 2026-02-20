@@ -138,9 +138,87 @@ router.get('/authorize', (req, res) => {
 
 /**
  * @swagger
+ * /oauth1/authorize/submit:
+ *   post:
+ *     summary: Handle OAuth1 authorization form submission (like Tumblr)
+ *     tags: [OAuth1]
+ */
+router.post('/authorize/submit', (req, res) => {
+  const config = configManager.getConfig();
+  const basicCreds = config.credentials.basic;
+
+  const { username, password, oauth_token, oauth_callback } = req.body;
+
+  logger.info('OAuth1 authorize/submit called', {
+    oauth_token: oauth_token ? oauth_token.substring(0, 10) + '...' : '[MISSING]',
+    oauth_callback: oauth_callback ? '[PRESENT]' : '[MISSING]',
+    username: username || '[MISSING]'
+  });
+
+  // Get token data first to retrieve stored callback
+  const tokenData = oauth_token ? tokenStore.requestTokens.get(oauth_token) : null;
+
+  // Use callback from form or from stored token data
+  const finalCallback = oauth_callback || (tokenData ? tokenData.callback : null);
+
+  // Validate user credentials
+  if (username !== basicCreds.username || password !== basicCreds.password) {
+    logger.info('Invalid credentials - redirecting back to login');
+    // Redirect back to login page with error
+    const loginUrl = `/oauth1-login.html?oauth_token=${encodeURIComponent(oauth_token || '')}&error=${encodeURIComponent('Invalid username or password')}`;
+    if (finalCallback) {
+      return res.redirect(loginUrl + `&oauth_callback=${encodeURIComponent(finalCallback)}`);
+    }
+    return res.redirect(loginUrl);
+  }
+
+  // Validate oauth_token
+  if (!oauth_token || !tokenData) {
+    logger.info('Invalid or missing oauth_token');
+    return res.status(400).send('Invalid or expired request token. Please start the OAuth flow again.');
+  }
+
+  // Generate verifier
+  const verifier = generateToken('ver');
+  tokenData.verifier = verifier;
+  tokenData.authorized = true;
+  tokenData.userId = username;
+
+  logger.info('Authorization successful', {
+    verifier: verifier.substring(0, 10) + '...',
+    callback: finalCallback ? 'YES' : 'NO'
+  });
+
+  // Redirect to callback with oauth_token and oauth_verifier
+  if (finalCallback && finalCallback !== 'oob') {
+    const separator = finalCallback.indexOf('?') >= 0 ? '&' : '?';
+    const redirectUrl = `${finalCallback}${separator}oauth_token=${encodeURIComponent(oauth_token)}&oauth_verifier=${encodeURIComponent(verifier)}`;
+    logger.info('Redirecting to callback', { redirectUrl: redirectUrl.substring(0, 100) + '...' });
+    return res.redirect(redirectUrl);
+  }
+
+  // No callback - show verifier code (OOB flow)
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Authorization Successful</title></head>
+    <body style="font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0;">
+      <div style="background: white; padding: 40px; border-radius: 10px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <h2 style="color: #38a169;">✅ Authorization Successful</h2>
+        <p>Your verification code:</p>
+        <code style="display: block; background: #edf2f7; padding: 15px; border-radius: 5px; font-size: 18px; margin: 20px 0;">${verifier}</code>
+        <p style="color: #718096; font-size: 14px;">Copy this code to your application to complete authorization.</p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+/**
+ * @swagger
  * /oauth1/authorize/login:
  *   post:
- *     summary: Handle OAuth1 login form submission
+ *     summary: Handle OAuth1 login form submission (legacy endpoint)
  *     tags: [OAuth1]
  */
 router.post('/authorize/login', (req, res) => {
