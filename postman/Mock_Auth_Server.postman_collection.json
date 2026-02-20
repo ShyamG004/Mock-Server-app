@@ -395,6 +395,94 @@
       "description": "OAuth 1.0 requires Authorization header for all endpoints",
       "item": [
         {
+          "name": "Callback URL Management",
+          "description": "CRUD operations for OAuth1 callback URLs",
+          "item": [
+            {
+              "name": "List Callback URLs",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/oauth1/callbacks"
+              }
+            },
+            {
+              "name": "Add Callback URL",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/oauth1/callbacks",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"callback_url\": \"https://myapp.com/oauth1/callback\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Delete Callback URL",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/oauth1/callbacks",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"callback_url\": \"https://myapp.com/oauth1/callback\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Reset Callback URLs to Defaults",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/oauth1/callbacks/reset"
+              }
+            },
+            {
+              "name": "Disable Strict Callback Validation",
+              "request": {
+                "method": "PUT",
+                "url": "{{baseUrl}}/oauth1/callbacks/validation",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"strict\": false\n}"
+                }
+              }
+            },
+            {
+              "name": "Enable Strict Callback Validation",
+              "request": {
+                "method": "PUT",
+                "url": "{{baseUrl}}/oauth1/callbacks/validation",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"strict\": true\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "Step 1 - Get Request Token",
           "event": [
             {
@@ -412,9 +500,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "var jsonData = pm.response.json();",
-                  "if (jsonData.details && jsonData.details.oauth_token) {",
-                  "    pm.collectionVariables.set('oauth1_request_token', jsonData.details.oauth_token);",
+                  "// Parse URL-encoded response: oauth_token=xxx&oauth_token_secret=xxx&oauth_callback_confirmed=true",
+                  "const responseText = pm.response.text();",
+                  "const params = new URLSearchParams(responseText);",
+                  "const oauthToken = params.get('oauth_token');",
+                  "if (oauthToken) {",
+                  "    pm.collectionVariables.set('oauth1_request_token', oauthToken);",
+                  "    console.log('Request token saved:', oauthToken);",
                   "}"
                 ]
               }
@@ -432,7 +524,7 @@
           }
         },
         {
-          "name": "Step 2 - Authorize",
+          "name": "Step 2 - Authorize (API Mode)",
           "event": [
             {
               "listen": "test",
@@ -441,6 +533,7 @@
                   "var jsonData = pm.response.json();",
                   "if (jsonData.details && jsonData.details.oauth_verifier) {",
                   "    pm.collectionVariables.set('oauth1_verifier', jsonData.details.oauth_verifier);",
+                  "    console.log('Verifier saved:', jsonData.details.oauth_verifier);",
                   "}"
                 ]
               }
@@ -448,7 +541,15 @@
           ],
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/oauth1/authorize?oauth_token={{oauth1_request_token}}"
+            "url": "{{baseUrl}}/oauth1/authorize?oauth_token={{oauth1_request_token}}&skip_login=true"
+          }
+        },
+        {
+          "name": "Step 2 - Authorize (Browser Login UI)",
+          "description": "Open this URL in browser to see the login UI",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/oauth1/authorize?oauth_token={{oauth1_request_token}}&oauth_callback=http://localhost:3000/callback"
           }
         },
         {
@@ -469,9 +570,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "var jsonData = pm.response.json();",
-                  "if (jsonData.details && jsonData.details.oauth_token) {",
-                  "    pm.collectionVariables.set('oauth1_access_token', jsonData.details.oauth_token);",
+                  "// Parse URL-encoded response: oauth_token=xxx&oauth_token_secret=xxx",
+                  "const responseText = pm.response.text();",
+                  "const params = new URLSearchParams(responseText);",
+                  "const accessToken = params.get('oauth_token');",
+                  "if (accessToken) {",
+                  "    pm.collectionVariables.set('oauth1_access_token', accessToken);",
+                  "    console.log('Access token saved:', accessToken);",
                   "}"
                 ]
               }

@@ -36,7 +36,8 @@ const redirectUriStore = {
     'http://localhost:8080/callback',
     'http://127.0.0.1:3000/callback',
     'https://oauth.pstmn.io/v1/callback',
-    'urn:ietf:wg:oauth:2.0:oob'
+    'urn:ietf:wg:oauth:2.0:oob',
+    'https://shyam-nts0023.csez.zohocorpin.com/applicationOauthRedirect'
   ])
 };
 
@@ -207,6 +208,7 @@ router.post('/redirect-uris/reset', (req, res) => {
   redirectUriStore.uris.add('http://127.0.0.1:3000/callback');
   redirectUriStore.uris.add('https://oauth.pstmn.io/v1/callback');
   redirectUriStore.uris.add('urn:ietf:wg:oauth:2.0:oob');
+  redirectUriStore.uris.add('https://shyam-nts0023.csez.zohocorpin.com/applicationOauthRedirect');
 
   res.json({
     status: 'success',
