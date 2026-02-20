@@ -61,17 +61,19 @@ router.post('/request-token', validateOAuth1Signature, (req, res) => {
  * @swagger
  * /oauth1/authorize:
  *   get:
- *     summary: OAuth1 authorization endpoint
+ *     summary: OAuth1 authorization endpoint - Shows login UI
  *     tags: [OAuth1]
  */
 router.get('/authorize', (req, res) => {
-  const { oauth_token, oauth_callback } = req.query;
+  const { oauth_token, oauth_callback, skip_login } = req.query;
 
   if (!oauth_token) {
     return res.status(400).json({
       status: 'failure',
       message: 'Missing oauth_token parameter',
-      details: {}
+      details: {
+        hint: 'First call /oauth1/request-token to get an oauth_token'
+      }
     });
   }
 
@@ -84,26 +86,85 @@ router.get('/authorize', (req, res) => {
     });
   }
 
-  // Generate verifier
+  // Skip login mode for API testing
+  if (skip_login === 'true') {
+    const verifier = generateToken('ver');
+    tokenData.verifier = verifier;
+    tokenData.authorized = true;
+
+    if (oauth_callback) {
+      const callbackUrl = new URL(oauth_callback);
+      callbackUrl.searchParams.set('oauth_token', oauth_token);
+      callbackUrl.searchParams.set('oauth_verifier', verifier);
+      return res.redirect(callbackUrl.toString());
+    }
+
+    return res.json({
+      status: 'success',
+      message: 'Authorization successful (skip_login mode)',
+      details: {
+        oauth_token,
+        oauth_verifier: verifier
+      }
+    });
+  }
+
+  // Redirect to login UI page
+  const loginUrl = new URL('/oauth1-login.html', `${req.protocol}://${req.get('host')}`);
+  loginUrl.searchParams.set('oauth_token', oauth_token);
+  if (oauth_callback) loginUrl.searchParams.set('oauth_callback', oauth_callback);
+
+  res.redirect(loginUrl.toString());
+});
+
+/**
+ * @swagger
+ * /oauth1/authorize/login:
+ *   post:
+ *     summary: Handle OAuth1 login form submission
+ *     tags: [OAuth1]
+ */
+router.post('/authorize/login', (req, res) => {
+  const config = configManager.getConfig();
+  const basicCreds = config.credentials.basic;
+
+  const { username, password, oauth_token, oauth_callback } = req.body;
+
+  // Validate user credentials
+  if (username !== basicCreds.username || password !== basicCreds.password) {
+    return res.status(401).json({
+      status: 'failure',
+      message: 'Invalid username or password'
+    });
+  }
+
+  // Validate oauth_token
+  if (!oauth_token) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'Missing oauth_token'
+    });
+  }
+
+  const tokenData = tokenStore.requestTokens.get(oauth_token);
+  if (!tokenData) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'Invalid or expired request token'
+    });
+  }
+
+  // Generate verifier and authorize token
   const verifier = generateToken('ver');
   tokenData.verifier = verifier;
   tokenData.authorized = true;
-
-  // If callback provided, redirect
-  if (oauth_callback) {
-    const callbackUrl = new URL(oauth_callback);
-    callbackUrl.searchParams.set('oauth_token', oauth_token);
-    callbackUrl.searchParams.set('oauth_verifier', verifier);
-    return res.redirect(callbackUrl.toString());
-  }
+  tokenData.userId = username;
 
   res.json({
     status: 'success',
     message: 'Authorization successful',
-    details: {
-      oauth_token,
-      oauth_verifier: verifier
-    }
+    oauth_token,
+    oauth_verifier: verifier
   });
 });
 

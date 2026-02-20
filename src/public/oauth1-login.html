@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authorize - OAuth1 Mock Server</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+    }
+
+    .login-header {
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .login-header h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .login-header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .oauth-badge {
+      display: inline-block;
+      background: #e94560;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .app-info {
+      background: #f7fafc;
+      padding: 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .app-info h3 {
+      font-size: 14px;
+      color: #718096;
+      margin-bottom: 10px;
+    }
+
+    .app-details {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .app-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #0f3460 0%, #e94560 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .app-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .app-url {
+      font-size: 12px;
+      color: #718096;
+    }
+
+    .token-info {
+      background: #edf2f7;
+      padding: 15px 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .token-info p {
+      font-size: 13px;
+      color: #4a5568;
+    }
+
+    .token-info code {
+      background: #e2e8f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    .permissions-section {
+      padding: 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .permissions-section h3 {
+      font-size: 14px;
+      color: #718096;
+      margin-bottom: 12px;
+    }
+
+    .permission-list {
+      list-style: none;
+    }
+
+    .permission-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      color: #4a5568;
+      font-size: 14px;
+    }
+
+    .permission-icon {
+      width: 24px;
+      height: 24px;
+      background: #ebf8ff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #3182ce;
+      font-size: 12px;
+    }
+
+    .login-form {
+      padding: 25px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #4a5568;
+      margin-bottom: 8px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #0f3460;
+      box-shadow: 0 0 0 3px rgba(15, 52, 96, 0.1);
+    }
+
+    .form-group input::placeholder {
+      color: #a0aec0;
+    }
+
+    .error-message {
+      background: #fff5f5;
+      color: #c53030;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .error-message.show {
+      display: block;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(15, 52, 96, 0.4);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #4a5568;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e0;
+    }
+
+    .login-footer {
+      padding: 20px;
+      background: #f7fafc;
+      text-align: center;
+      font-size: 12px;
+      color: #718096;
+    }
+
+    .login-footer a {
+      color: #0f3460;
+      text-decoration: none;
+    }
+
+    .credentials-hint {
+      background: #fffbeb;
+      border: 1px solid #f6e05e;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #744210;
+    }
+
+    .credentials-hint strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .loading.show {
+      display: block;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #e2e8f0;
+      border-top-color: #0f3460;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .no-token-error {
+      padding: 40px;
+      text-align: center;
+    }
+
+    .no-token-error h2 {
+      color: #c53030;
+      margin-bottom: 10px;
+    }
+
+    .no-token-error p {
+      color: #718096;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h1>🔑 Authorize Access</h1>
+      <p>OAuth 1.0 Authentication</p>
+      <span class="oauth-badge">OAuth 1.0</span>
+    </div>
+
+    <div id="mainContent">
+      <div class="app-info">
+        <h3>Application requesting access:</h3>
+        <div class="app-details">
+          <div class="app-icon" id="appIcon">A</div>
+          <div>
+            <div class="app-name" id="appName">Application</div>
+            <div class="app-url" id="appUrl">OAuth 1.0 Client</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="token-info">
+        <p><strong>Request Token:</strong> <code id="tokenDisplay">-</code></p>
+      </div>
+
+      <div class="permissions-section">
+        <h3>This application will be able to:</h3>
+        <ul class="permission-list">
+          <li class="permission-item">
+            <span class="permission-icon">✓</span> Access your account information
+          </li>
+          <li class="permission-item">
+            <span class="permission-icon">✓</span> Read your data
+          </li>
+          <li class="permission-item">
+            <span class="permission-icon">✓</span> Perform actions on your behalf
+          </li>
+        </ul>
+      </div>
+
+      <form class="login-form" id="loginForm">
+        <div class="credentials-hint">
+          <strong>🧪 Test Credentials:</strong>
+          Username: <code>testuser</code> | Password: <code>testpass123</code>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" placeholder="Enter your username" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+
+        <div class="btn-group">
+          <button type="button" class="btn btn-secondary" onclick="handleDeny()">Deny</button>
+          <button type="submit" class="btn btn-primary">Authorize</button>
+        </div>
+      </form>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Authorizing...</p>
+      </div>
+    </div>
+
+    <div id="noTokenError" class="no-token-error" style="display: none;">
+      <h2>⚠️ Missing Token</h2>
+      <p>No oauth_token provided. Please start the OAuth flow from your application.</p>
+    </div>
+
+    <div class="login-footer">
+      By authorizing, you allow this application to access your account.<br>
+      <a href="/api-docs" target="_blank">API Documentation</a>
+    </div>
+  </div>
+
+  <script>
+    // Parse URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthToken = urlParams.get('oauth_token');
+    const oauthCallback = urlParams.get('oauth_callback');
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!oauthToken) {
+        document.getElementById('mainContent').style.display = 'none';
+        document.getElementById('noTokenError').style.display = 'block';
+        return;
+      }
+
+      // Display token (truncated)
+      const displayToken = oauthToken.length > 20
+        ? oauthToken.substring(0, 20) + '...'
+        : oauthToken;
+      document.getElementById('tokenDisplay').textContent = displayToken;
+
+      // Set app info
+      document.getElementById('appName').textContent = 'OAuth 1.0 Client';
+      document.getElementById('appUrl').textContent = oauthCallback || 'No callback specified';
+      document.getElementById('appIcon').textContent = 'O';
+    });
+
+    // Handle form submission
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorMessage = document.getElementById('errorMessage');
+      const loginForm = document.getElementById('loginForm');
+      const loading = document.getElementById('loading');
+
+      // Hide error
+      errorMessage.classList.remove('show');
+
+      // Show loading
+      loginForm.style.display = 'none';
+      loading.classList.add('show');
+
+      try {
+        // Validate credentials and authorize token
+        const authResponse = await fetch('/oauth1/authorize/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            username,
+            password,
+            oauth_token: oauthToken,
+            oauth_callback: oauthCallback
+          })
+        });
+
+        const result = await authResponse.json();
+
+        if (authResponse.ok && result.status === 'success') {
+          // Redirect with verifier
+          if (oauthCallback) {
+            const callbackUrl = new URL(oauthCallback);
+            callbackUrl.searchParams.set('oauth_token', oauthToken);
+            callbackUrl.searchParams.set('oauth_verifier', result.oauth_verifier);
+            window.location.href = callbackUrl.toString();
+          } else {
+            // Show verifier if no callback
+            loading.classList.remove('show');
+            loginForm.innerHTML = `
+              <div style="text-align: center; padding: 20px;">
+                <h3 style="color: #38a169; margin-bottom: 15px;">✅ Authorization Successful!</h3>
+                <p style="margin-bottom: 10px;">Your verification code:</p>
+                <code style="background: #edf2f7; padding: 10px 20px; border-radius: 8px; font-size: 16px; display: block; word-break: break-all;">
+                  ${result.oauth_verifier}
+                </code>
+                <p style="margin-top: 15px; font-size: 13px; color: #718096;">
+                  Enter this code in your application to complete authorization.
+                </p>
+              </div>
+            `;
+            loginForm.style.display = 'block';
+          }
+        } else {
+          // Show error
+          loading.classList.remove('show');
+          loginForm.style.display = 'block';
+          errorMessage.textContent = result.message || 'Authentication failed';
+          errorMessage.classList.add('show');
+        }
+      } catch (error) {
+        loading.classList.remove('show');
+        loginForm.style.display = 'block';
+        errorMessage.textContent = 'Connection error. Please try again.';
+        errorMessage.classList.add('show');
+      }
+    });
+
+    // Handle deny
+    function handleDeny() {
+      if (oauthCallback) {
+        const callbackUrl = new URL(oauthCallback);
+        callbackUrl.searchParams.set('oauth_problem', 'user_refused');
+        window.location.href = callbackUrl.toString();
+      } else {
+        window.close();
+        // If window.close doesn't work, show message
+        document.getElementById('mainContent').innerHTML = `
+          <div style="text-align: center; padding: 40px;">
+            <h3 style="color: #c53030;">❌ Authorization Denied</h3>
+            <p style="color: #718096; margin-top: 10px;">You have denied the authorization request.</p>
+          </div>
+        `;
+      }
+    }
+  </script>
+</body>
+</html>
+
