@@ -52,15 +52,9 @@ router.post('/request-token', validateOAuth1Signature, (req, res) => {
   // Clean up old tokens
   cleanupExpiredTokens();
 
-  res.json({
-    status: 'success',
-    message: 'Request token issued',
-    details: {
-      oauth_token: requestToken,
-      oauth_token_secret: requestTokenSecret,
-      oauth_callback_confirmed: 'true'
-    }
-  });
+  // OAuth1 standard response format: URL-encoded form
+  res.set('Content-Type', 'application/x-www-form-urlencoded');
+  res.send(`oauth_token=${encodeURIComponent(requestToken)}&oauth_token_secret=${encodeURIComponent(requestTokenSecret)}&oauth_callback_confirmed=true`);
 });
 
 /**
@@ -173,14 +167,9 @@ router.post('/access-token', validateOAuth1Signature, (req, res) => {
   // Remove used request token
   tokenStore.requestTokens.delete(oauthToken);
 
-  res.json({
-    status: 'success',
-    message: 'Access token issued',
-    details: {
-      oauth_token: accessToken,
-      oauth_token_secret: accessTokenSecret
-    }
-  });
+  // OAuth1 standard response format: URL-encoded form
+  res.set('Content-Type', 'application/x-www-form-urlencoded');
+  res.send(`oauth_token=${encodeURIComponent(accessToken)}&oauth_token_secret=${encodeURIComponent(accessTokenSecret)}`);
 });
 
 /**
