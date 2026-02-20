@@ -447,25 +447,49 @@
         const result = await authResponse.json();
 
         if (authResponse.ok && result.status === 'success') {
+          // Get callback from response (server might have it from request-token step)
+          const finalCallback = result.oauth_callback || oauthCallback;
+
           // Redirect with verifier
-          if (oauthCallback) {
-            const callbackUrl = new URL(oauthCallback);
-            callbackUrl.searchParams.set('oauth_token', oauthToken);
-            callbackUrl.searchParams.set('oauth_verifier', result.oauth_verifier);
-            window.location.href = callbackUrl.toString();
+          if (finalCallback && finalCallback !== 'oob') {
+            // Build callback URL with oauth_token and oauth_verifier
+            let redirectUrl;
+            try {
+              // Handle relative and absolute URLs
+              if (finalCallback.startsWith('http://') || finalCallback.startsWith('https://')) {
+                redirectUrl = new URL(finalCallback);
+              } else {
+                redirectUrl = new URL(finalCallback, window.location.origin);
+              }
+              redirectUrl.searchParams.set('oauth_token', oauthToken);
+              redirectUrl.searchParams.set('oauth_verifier', result.oauth_verifier);
+
+              // Redirect immediately - the application will handle the rest
+              window.location.href = redirectUrl.toString();
+              return; // Stop execution
+            } catch (urlError) {
+              console.error('URL parsing error:', urlError);
+              // If URL parsing fails, try direct redirect
+              const separator = finalCallback.includes('?') ? '&' : '?';
+              window.location.href = `${finalCallback}${separator}oauth_token=${encodeURIComponent(oauthToken)}&oauth_verifier=${encodeURIComponent(result.oauth_verifier)}`;
+              return; // Stop execution
+            }
           } else {
-            // Show verifier if no callback
+            // No callback (oob flow) - show verifier for manual entry
             loading.classList.remove('show');
             loginForm.innerHTML = `
               <div style="text-align: center; padding: 20px;">
                 <h3 style="color: #38a169; margin-bottom: 15px;">✅ Authorization Successful!</h3>
                 <p style="margin-bottom: 10px;">Your verification code:</p>
-                <code style="background: #edf2f7; padding: 10px 20px; border-radius: 8px; font-size: 16px; display: block; word-break: break-all;">
+                <code style="background: #edf2f7; padding: 10px 20px; border-radius: 8px; font-size: 18px; display: block; word-break: break-all; user-select: all; cursor: pointer;" onclick="copyToClipboard(this)" title="Click to copy">
                   ${result.oauth_verifier}
                 </code>
                 <p style="margin-top: 15px; font-size: 13px; color: #718096;">
-                  Enter this code in your application to complete authorization.
+                  Copy this code and paste it in your application to complete authorization.
                 </p>
+                <button onclick="window.close()" style="margin-top: 20px; padding: 10px 30px; background: #38a169; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                  Close Window
+                </button>
               </div>
             `;
             loginForm.style.display = 'block';
@@ -484,6 +508,18 @@
         errorMessage.classList.add('show');
       }
     });
+
+    // Copy to clipboard helper
+    function copyToClipboard(element) {
+      const text = element.textContent.trim();
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = element.innerHTML;
+        element.innerHTML = '✅ Copied!';
+        setTimeout(() => {
+          element.innerHTML = originalText;
+        }, 2000);
+      });
+    }
 
     // Handle deny
     function handleDeny() {

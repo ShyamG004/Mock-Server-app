@@ -212,11 +212,27 @@ router.post('/request-token', validateOAuth1Signature, (req, res) => {
   const requestToken = generateToken('rt');
   const requestTokenSecret = generateToken('rts');
 
-  // Store request token
+  // Get oauth_callback from OAuth params (from Authorization header)
+  const oauthCallback = req.oauth1Params.oauth_callback || req.body.oauth_callback || req.query.oauth_callback;
+
+  // Validate callback URL if provided
+  if (oauthCallback && oauthCallback !== 'oob') {
+    const callbackResult = validateCallbackUrl(oauthCallback);
+    if (!callbackResult.valid) {
+      return res.status(400).json({
+        status: 'failure',
+        message: callbackResult.error,
+        details: callbackResult.details
+      });
+    }
+  }
+
+  // Store request token with callback
   tokenStore.requestTokens.set(requestToken, {
     secret: requestTokenSecret,
     created: Date.now(),
-    consumerKey: req.oauth1Params.oauth_consumer_key
+    consumerKey: req.oauth1Params.oauth_consumer_key,
+    callback: oauthCallback || null
   });
 
   // Clean up old tokens
@@ -235,7 +251,9 @@ router.post('/request-token', validateOAuth1Signature, (req, res) => {
  *     tags: [OAuth1]
  */
 router.get('/authorize', (req, res) => {
-  const { oauth_token, oauth_callback, skip_login } = req.query;
+  const { oauth_token, skip_login } = req.query;
+  // oauth_callback can come from query OR from stored token data
+  let oauth_callback = req.query.oauth_callback;
 
   if (!oauth_token) {
     return res.status(400).json({
@@ -256,8 +274,13 @@ router.get('/authorize', (req, res) => {
     });
   }
 
+  // Use stored callback if not provided in query (OAuth1.0a standard)
+  if (!oauth_callback && tokenData.callback) {
+    oauth_callback = tokenData.callback;
+  }
+
   // Validate callback URL if provided
-  if (oauth_callback) {
+  if (oauth_callback && oauth_callback !== 'oob') {
     const callbackResult = validateCallbackUrl(oauth_callback);
     if (!callbackResult.valid) {
       return res.status(400).json({
@@ -274,7 +297,7 @@ router.get('/authorize', (req, res) => {
     tokenData.verifier = verifier;
     tokenData.authorized = true;
 
-    if (oauth_callback) {
+    if (oauth_callback && oauth_callback !== 'oob') {
       const callbackUrl = new URL(oauth_callback);
       callbackUrl.searchParams.set('oauth_token', oauth_token);
       callbackUrl.searchParams.set('oauth_verifier', verifier);
@@ -294,7 +317,9 @@ router.get('/authorize', (req, res) => {
   // Redirect to login UI page
   const loginUrl = new URL('/oauth1-login.html', `${req.protocol}://${req.get('host')}`);
   loginUrl.searchParams.set('oauth_token', oauth_token);
-  if (oauth_callback) loginUrl.searchParams.set('oauth_callback', oauth_callback);
+  if (oauth_callback && oauth_callback !== 'oob') {
+    loginUrl.searchParams.set('oauth_callback', oauth_callback);
+  }
 
   res.redirect(loginUrl.toString());
 });
@@ -336,17 +361,22 @@ router.post('/authorize/login', (req, res) => {
     });
   }
 
+  // Use callback from request body or from stored token data
+  const finalCallback = oauth_callback || tokenData.callback;
+
   // Generate verifier and authorize token
   const verifier = generateToken('ver');
   tokenData.verifier = verifier;
   tokenData.authorized = true;
   tokenData.userId = username;
 
+  // Return response with callback URL for redirect
   res.json({
     status: 'success',
     message: 'Authorization successful',
     oauth_token,
-    oauth_verifier: verifier
+    oauth_verifier: verifier,
+    oauth_callback: finalCallback || null
   });
 });
 
