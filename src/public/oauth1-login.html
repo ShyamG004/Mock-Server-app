@@ -353,9 +353,20 @@
 
         <div class="error-message" id="errorMessage"></div>
 
-        <!-- Hidden fields for OAuth params -->
-        <input type="hidden" name="oauth_token" id="oauth_token_field" value="">
-        <input type="hidden" name="oauth_callback" id="oauth_callback_field" value="">
+        <!-- Hidden fields for OAuth params - values set by inline script below -->
+        <input type="hidden" name="oauth_token" id="oauth_token_field">
+        <input type="hidden" name="oauth_callback" id="oauth_callback_field">
+
+        <script>
+          // Set hidden field values immediately from URL params
+          (function() {
+            var params = new URLSearchParams(window.location.search);
+            var tokenField = document.getElementById('oauth_token_field');
+            var callbackField = document.getElementById('oauth_callback_field');
+            if (tokenField) tokenField.value = params.get('oauth_token') || '';
+            if (callbackField) callbackField.value = params.get('oauth_callback') || '';
+          })();
+        </script>
 
         <div class="form-group">
           <label for="username">Username</label>
@@ -392,22 +403,19 @@
     const oauthCallback = urlParams.get('oauth_callback');
     const errorParam = urlParams.get('error');
 
-    // Initialize page
-    document.addEventListener('DOMContentLoaded', () => {
+    // Initialize page on DOM ready
+    document.addEventListener('DOMContentLoaded', function() {
+      var mainContent = document.getElementById('mainContent');
+      var noTokenError = document.getElementById('noTokenError');
+
       if (!oauthToken) {
-        document.getElementById('mainContent').style.display = 'none';
-        document.getElementById('noTokenError').style.display = 'block';
+        mainContent.style.display = 'none';
+        noTokenError.style.display = 'block';
         return;
       }
 
-      // Set hidden form fields
-      document.getElementById('oauth_token_field').value = oauthToken;
-      if (oauthCallback) {
-        document.getElementById('oauth_callback_field').value = oauthCallback;
-      }
-
       // Display token (truncated)
-      const displayToken = oauthToken.length > 20
+      var displayToken = oauthToken.length > 20
         ? oauthToken.substring(0, 20) + '...'
         : oauthToken;
       document.getElementById('tokenDisplay').textContent = displayToken;
@@ -419,34 +427,30 @@
 
       // Show error if redirected back with error
       if (errorParam) {
-        const errorMessage = document.getElementById('errorMessage');
+        var errorMessage = document.getElementById('errorMessage');
         errorMessage.textContent = decodeURIComponent(errorParam);
         errorMessage.classList.add('show');
       }
     });
 
-    // Handle deny
+    // Handle deny button
     function handleDeny() {
       if (oauthCallback && oauthCallback !== 'oob') {
         try {
-          const callbackUrl = new URL(oauthCallback);
+          var callbackUrl = new URL(oauthCallback);
           callbackUrl.searchParams.set('oauth_problem', 'user_refused');
           window.location.href = callbackUrl.toString();
         } catch (e) {
-          const separator = oauthCallback.includes('?') ? '&' : '?';
-          window.location.href = `${oauthCallback}${separator}oauth_problem=user_refused`;
+          var separator = oauthCallback.includes('?') ? '&' : '?';
+          window.location.href = oauthCallback + separator + 'oauth_problem=user_refused';
         }
       } else {
-        // No callback - just show denied message
-        document.getElementById('mainContent').innerHTML = `
-          <div style="text-align: center; padding: 40px;">
-            <h3 style="color: #c53030;">❌ Authorization Denied</h3>
-            <p style="color: #718096; margin-top: 10px;">You have denied the authorization request.</p>
-            <button onclick="window.close()" style="margin-top: 20px; padding: 10px 30px; background: #718096; color: white; border: none; border-radius: 8px; cursor: pointer;">
-              Close Window
-            </button>
-          </div>
-        `;
+        document.getElementById('mainContent').innerHTML =
+          '<div style="text-align: center; padding: 40px;">' +
+          '<h3 style="color: #c53030;">❌ Authorization Denied</h3>' +
+          '<p style="color: #718096; margin-top: 10px;">You have denied the authorization request.</p>' +
+          '<button onclick="window.close()" style="margin-top: 20px; padding: 10px 30px; background: #718096; color: white; border: none; border-radius: 8px; cursor: pointer;">Close Window</button>' +
+          '</div>';
       }
     }
   </script>
