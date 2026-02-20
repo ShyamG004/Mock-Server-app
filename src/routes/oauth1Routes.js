@@ -149,8 +149,15 @@ router.post('/authorize/login', (req, res) => {
 
   const { username, password, oauth_token, oauth_callback } = req.body;
 
+  logger.info('OAuth1 authorize/login called', {
+    oauth_token: oauth_token ? '[PRESENT]' : '[MISSING]',
+    oauth_callback: oauth_callback ? '[PRESENT]' : '[MISSING]',
+    username: username ? '[PRESENT]' : '[MISSING]'
+  });
+
   // Validate user credentials
   if (username !== basicCreds.username || password !== basicCreds.password) {
+    logger.info('Invalid credentials');
     // For form submission, redirect back with error
     if (req.headers['content-type']?.includes('application/x-www-form-urlencoded')) {
       const loginUrl = new URL('/oauth1-login.html', `${req.protocol}://${req.get('host')}`);
@@ -167,6 +174,7 @@ router.post('/authorize/login', (req, res) => {
 
   // Validate oauth_token
   if (!oauth_token) {
+    logger.info('Missing oauth_token');
     return res.status(400).json({
       status: 'failure',
       message: 'Missing oauth_token'
@@ -175,6 +183,7 @@ router.post('/authorize/login', (req, res) => {
 
   const tokenData = tokenStore.requestTokens.get(oauth_token);
   if (!tokenData) {
+    logger.info('Invalid or expired request token');
     return res.status(400).json({
       status: 'failure',
       message: 'Invalid or expired request token'
@@ -183,6 +192,7 @@ router.post('/authorize/login', (req, res) => {
 
   // Use callback from request body or from stored token data
   const finalCallback = oauth_callback || tokenData.callback;
+  logger.info('Final callback URL', { finalCallback });
 
   // Generate verifier and authorize token
   const verifier = generateToken('ver');
@@ -190,21 +200,28 @@ router.post('/authorize/login', (req, res) => {
   tokenData.authorized = true;
   tokenData.userId = username;
 
+  logger.info('Generated verifier', { verifier });
+
   // If callback exists, redirect directly (like Tumblr does)
   if (finalCallback && finalCallback !== 'oob') {
-    try {
-      const callbackUrl = new URL(finalCallback);
-      callbackUrl.searchParams.set('oauth_token', oauth_token);
-      callbackUrl.searchParams.set('oauth_verifier', verifier);
-      return res.redirect(callbackUrl.toString());
-    } catch (e) {
-      // If URL parsing fails, append params manually
-      const separator = finalCallback.includes('?') ? '&' : '?';
-      return res.redirect(`${finalCallback}${separator}oauth_token=${encodeURIComponent(oauth_token)}&oauth_verifier=${encodeURIComponent(verifier)}`);
+    // Build redirect URL by appending oauth params
+    let redirectUrl;
+
+    // Check if callback already has query params
+    if (finalCallback.indexOf('?') !== -1) {
+      // Append with &
+      redirectUrl = finalCallback + '&oauth_token=' + encodeURIComponent(oauth_token) + '&oauth_verifier=' + encodeURIComponent(verifier);
+    } else {
+      // Append with ?
+      redirectUrl = finalCallback + '?oauth_token=' + encodeURIComponent(oauth_token) + '&oauth_verifier=' + encodeURIComponent(verifier);
     }
+
+    logger.info('Redirecting to callback', { redirectUrl });
+    return res.redirect(redirectUrl);
   }
 
   // No callback (oob flow) - return JSON with verifier
+  logger.info('OOB flow - returning JSON');
   res.json({
     status: 'success',
     message: 'Authorization successful',
