@@ -146,13 +146,15 @@ router.get('/authorize', (req, res) => {
 router.post('/authorize/submit', (req, res) => {
   const config = configManager.getConfig();
   const basicCreds = config.credentials.basic;
+  const isJsonRequest = req.headers['content-type']?.includes('application/json');
 
   const { username, password, oauth_token, oauth_callback } = req.body;
 
   logger.info('OAuth1 authorize/submit called', {
     oauth_token: oauth_token ? oauth_token.substring(0, 10) + '...' : '[MISSING]',
     oauth_callback: oauth_callback ? '[PRESENT]' : '[MISSING]',
-    username: username || '[MISSING]'
+    username: username || '[MISSING]',
+    isJsonRequest
   });
 
   // Get token data first to retrieve stored callback
@@ -163,7 +165,13 @@ router.post('/authorize/submit', (req, res) => {
 
   // Validate user credentials
   if (username !== basicCreds.username || password !== basicCreds.password) {
-    logger.info('Invalid credentials - redirecting back to login');
+    logger.info('Invalid credentials');
+    if (isJsonRequest) {
+      return res.status(401).json({
+        status: 'failure',
+        message: 'Invalid username or password'
+      });
+    }
     // Redirect back to login page with error
     const loginUrl = `/oauth1-login.html?oauth_token=${encodeURIComponent(oauth_token || '')}&error=${encodeURIComponent('Invalid username or password')}`;
     if (finalCallback) {
@@ -175,6 +183,12 @@ router.post('/authorize/submit', (req, res) => {
   // Validate oauth_token
   if (!oauth_token || !tokenData) {
     logger.info('Invalid or missing oauth_token');
+    if (isJsonRequest) {
+      return res.status(400).json({
+        status: 'failure',
+        message: 'Invalid or expired request token. Please start the OAuth flow again.'
+      });
+    }
     return res.status(400).send('Invalid or expired request token. Please start the OAuth flow again.');
   }
 
@@ -189,7 +203,28 @@ router.post('/authorize/submit', (req, res) => {
     callback: finalCallback ? 'YES' : 'NO'
   });
 
-  // Redirect to callback with oauth_token and oauth_verifier
+  // For JSON requests (fetch API), return JSON response
+  if (isJsonRequest) {
+    if (finalCallback && finalCallback !== 'oob') {
+      const separator = finalCallback.indexOf('?') >= 0 ? '&' : '?';
+      const redirectUrl = `${finalCallback}${separator}oauth_token=${encodeURIComponent(oauth_token)}&oauth_verifier=${encodeURIComponent(verifier)}`;
+      return res.json({
+        status: 'success',
+        message: 'Authorization successful',
+        oauth_token: oauth_token,
+        oauth_verifier: verifier,
+        redirect_url: redirectUrl
+      });
+    }
+    return res.json({
+      status: 'success',
+      message: 'Authorization successful',
+      oauth_token: oauth_token,
+      oauth_verifier: verifier
+    });
+  }
+
+  // For form submissions, redirect to callback
   if (finalCallback && finalCallback !== 'oob') {
     const separator = finalCallback.indexOf('?') >= 0 ? '&' : '?';
     const redirectUrl = `${finalCallback}${separator}oauth_token=${encodeURIComponent(oauth_token)}&oauth_verifier=${encodeURIComponent(verifier)}`;
