@@ -115,13 +115,6 @@
       background: linear-gradient(135deg, #0f3460, #16213e);
       color: white;
     }
-    .btn-primary:hover {
-      opacity: 0.9;
-    }
-    .btn-primary:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
     .btn-secondary { background: #e2e8f0; color: #4a5568; }
     .footer {
       padding: 15px;
@@ -134,26 +127,6 @@
       padding: 40px;
       text-align: center;
       color: #c53030;
-    }
-    .loading {
-      display: none;
-      text-align: center;
-      padding: 20px;
-    }
-    .loading.show {
-      display: block;
-    }
-    .spinner {
-      width: 30px;
-      height: 30px;
-      border: 3px solid #e2e8f0;
-      border-top-color: #0f3460;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 10px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
     }
   </style>
 </head>
@@ -179,27 +152,26 @@
 
       <div class="error" id="error"></div>
 
-      <div id="formContainer">
+      <!-- Simple HTML Form - Server handles everything -->
+      <form method="POST" action="/oauth1/authorize/submit">
+        <input type="hidden" name="oauth_token" id="hToken">
+        <input type="hidden" name="oauth_callback" id="hCallback">
+
         <div class="field">
           <label>Username</label>
-          <input type="text" id="username" required placeholder="Enter username">
+          <input type="text" name="username" required placeholder="Enter username">
         </div>
 
         <div class="field">
           <label>Password</label>
-          <input type="password" id="password" required placeholder="Enter password">
+          <input type="password" name="password" required placeholder="Enter password">
         </div>
 
         <div class="buttons">
           <button type="button" class="btn btn-secondary" onclick="denyAccess()">Deny</button>
-          <button type="button" class="btn btn-primary" id="authorizeBtn" onclick="authorize()">Authorize</button>
+          <button type="submit" class="btn btn-primary">Authorize</button>
         </div>
-      </div>
-
-      <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <p>Authorizing...</p>
-      </div>
+      </form>
     </div>
 
     <div class="no-token" id="noToken" style="display:none;">
@@ -213,112 +185,40 @@
   </div>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const oauthToken = params.get('oauth_token') || '';
-    const oauthCallback = params.get('oauth_callback') || '';
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      var token = params.get('oauth_token') || '';
+      var callback = params.get('oauth_callback') || '';
+      var error = params.get('error');
 
-    // Display callback URL
-    document.getElementById('callbackUrl').textContent = oauthCallback || 'No callback';
+      // Set hidden fields
+      document.getElementById('hToken').value = token;
+      document.getElementById('hCallback').value = callback;
+      document.getElementById('callbackUrl').textContent = callback || 'No callback';
 
-    // Show error if no token
-    if (!oauthToken) {
-      document.getElementById('content').style.display = 'none';
-      document.getElementById('noToken').style.display = 'block';
-    }
+      // Show error if any
+      if (error) {
+        var errDiv = document.getElementById('error');
+        errDiv.textContent = error;
+        errDiv.classList.add('show');
+      }
 
-    // Show error from URL if any
-    const urlError = params.get('error');
-    if (urlError) {
-      const errDiv = document.getElementById('error');
-      errDiv.textContent = urlError;
-      errDiv.classList.add('show');
-    }
+      // No token = show error
+      if (!token) {
+        document.getElementById('content').style.display = 'none';
+        document.getElementById('noToken').style.display = 'block';
+      }
+    })();
 
     function denyAccess() {
-      if (oauthCallback) {
-        const sep = oauthCallback.indexOf('?') >= 0 ? '&' : '?';
-        window.location.href = oauthCallback + sep + 'oauth_problem=user_refused';
+      var callback = document.getElementById('hCallback').value;
+      if (callback) {
+        var sep = callback.indexOf('?') >= 0 ? '&' : '?';
+        window.location.href = callback + sep + 'oauth_problem=user_refused';
       } else {
         alert('Authorization denied. You can close this window.');
-        window.close();
       }
     }
-
-    async function authorize() {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      const errorDiv = document.getElementById('error');
-      const formContainer = document.getElementById('formContainer');
-      const loading = document.getElementById('loading');
-      const authorizeBtn = document.getElementById('authorizeBtn');
-
-      // Validate input
-      if (!username || !password) {
-        errorDiv.textContent = 'Please enter both username and password';
-        errorDiv.classList.add('show');
-        return;
-      }
-
-      // Hide error, show loading
-      errorDiv.classList.remove('show');
-      formContainer.style.display = 'none';
-      loading.classList.add('show');
-      authorizeBtn.disabled = true;
-
-      try {
-        // Submit authorization via fetch (avoiding form-action CSP issues)
-        const response = await fetch('/oauth1/authorize/submit', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            oauth_token: oauthToken,
-            oauth_callback: oauthCallback,
-            username: username,
-            password: password
-          })
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.status === 'success') {
-          // Redirect to callback with verifier
-          if (result.redirect_url) {
-            window.location.href = result.redirect_url;
-          } else if (oauthCallback) {
-            const sep = oauthCallback.indexOf('?') >= 0 ? '&' : '?';
-            window.location.href = oauthCallback + sep +
-              'oauth_token=' + encodeURIComponent(result.oauth_token || oauthToken) +
-              '&oauth_verifier=' + encodeURIComponent(result.oauth_verifier);
-          } else {
-            // No callback - show verifier
-            alert('Authorization successful!\nVerifier: ' + result.oauth_verifier);
-            window.close();
-          }
-        } else {
-          // Show error
-          loading.classList.remove('show');
-          formContainer.style.display = 'block';
-          authorizeBtn.disabled = false;
-          errorDiv.textContent = result.message || 'Authorization failed';
-          errorDiv.classList.add('show');
-        }
-      } catch (err) {
-        loading.classList.remove('show');
-        formContainer.style.display = 'block';
-        authorizeBtn.disabled = false;
-        errorDiv.textContent = 'Connection error: ' + err.message;
-        errorDiv.classList.add('show');
-      }
-    }
-
-    // Allow Enter key to submit
-    document.getElementById('password').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        authorize();
-      }
-    });
   </script>
 </body>
 </html>
