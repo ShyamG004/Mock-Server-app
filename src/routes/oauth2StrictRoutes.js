@@ -209,6 +209,11 @@ router.post('/redirect-uris/reset', (req, res) => {
   redirectUriStore.uris.add('https://oauth.pstmn.io/v1/callback');
   redirectUriStore.uris.add('urn:ietf:wg:oauth:2.0:oob');
   redirectUriStore.uris.add('https://shyam-nts0023.csez.zohocorpin.com/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://shyam-nts0023.csez.zohocorpin.com:443/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://logqa-u22-5.csez.zohocorpin.com:443/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://logqa-u22-5.csez.zohocorpin.com/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://vimal-17786t.csez.zohocorpin.com:443/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://vimal-17786t.csez.zohocorpin.com/applicationOauthRedirect');
 
   res.json({
     status: 'success',
