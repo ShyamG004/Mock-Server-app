@@ -37,7 +37,13 @@ const redirectUriStore = {
     'http://127.0.0.1:3000/callback',
     'https://oauth.pstmn.io/v1/callback',
     'urn:ietf:wg:oauth:2.0:oob',
-    'https://shyam-nts0023.csez.zohocorpin.com/applicationOauthRedirect'
+    'https://shyam-nts0023.csez.zohocorpin.com/applicationOauthRedirect',
+    'https://logqa-u22-5.csez.zohocorpin.com:443/applicationOauthRedirect',
+    'https://logqa-u22-5.csez.zohocorpin.com/applicationOauthRedirect',
+    'https://vimal-17786t.csez.zohocorpin.com:443/applicationOauthRedirect',
+    'https://vimal-17786t.csez.zohocorpin.com/applicationOauthRedirect',
+    'https://log360cloud-d3.localzoho.com:8443/applicationOauthRedirect',
+    'https://log360cloud-d3.localzoho.com/applicationOauthRedirect'
   ])
 };
 
@@ -214,6 +220,8 @@ router.post('/redirect-uris/reset', (req, res) => {
   redirectUriStore.uris.add('https://logqa-u22-5.csez.zohocorpin.com/applicationOauthRedirect');
   redirectUriStore.uris.add('https://vimal-17786t.csez.zohocorpin.com:443/applicationOauthRedirect');
   redirectUriStore.uris.add('https://vimal-17786t.csez.zohocorpin.com/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://log360cloud-d3.localzoho.com:8443/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://log360cloud-d3.localzoho.com/applicationOauthRedirect');
 
   res.json({
     status: 'success',
