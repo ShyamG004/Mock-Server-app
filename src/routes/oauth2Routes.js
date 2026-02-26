@@ -200,7 +200,7 @@ router.post('/token/basic', (req, res) => {
   const authHeader = req.headers.authorization;
 
   // STRICT: Only accept Basic Auth header
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
+  if (!authHeader || !authHeader.toLowerCase().startsWith('basic ')) {
     return res.status(401).json({
       error: 'invalid_client',
       error_description: 'This endpoint requires Client Secret Basic authentication (Authorization header)',
@@ -215,19 +215,7 @@ router.post('/token/basic', (req, res) => {
     });
   }
 
-  // Reject if credentials are also in body
-  if (req.body.client_secret) {
-    return res.status(400).json({
-      error: 'invalid_request',
-      error_description: 'Client Secret Basic does not allow client_secret in request body',
-      status: 'failure',
-      message: 'client_secret should not be in body when using Basic Auth',
-      details: {
-        endpoint: '/token/basic',
-        hint: 'Remove client_secret from body, use Authorization header only'
-      }
-    });
-  }
+  // Note: client_secret in body is allowed alongside Basic auth header
 
   const clientAuth = validateBasicAuth(req, config);
   if (!clientAuth.valid) {
@@ -255,7 +243,7 @@ router.post('/token/post', (req, res) => {
   const authHeader = req.headers.authorization;
 
   // STRICT: Reject if Basic Auth header is present
-  if (authHeader && authHeader.startsWith('Basic ')) {
+  if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
     return res.status(400).json({
       error: 'invalid_request',
       error_description: 'This endpoint requires Client Secret Post (credentials in body, not header)',
@@ -311,7 +299,7 @@ router.post('/token/jwt', (req, res) => {
   const authHeader = req.headers.authorization;
 
   // STRICT: Reject if Basic Auth header is present
-  if (authHeader && authHeader.startsWith('Basic ')) {
+  if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
     return res.status(400).json({
       error: 'invalid_request',
       error_description: 'This endpoint requires Client Secret JWT authentication',
@@ -382,7 +370,7 @@ router.post('/token/pkce', (req, res) => {
   const authHeader = req.headers.authorization;
 
   // STRICT: Reject if Basic Auth header is present
-  if (authHeader && authHeader.startsWith('Basic ')) {
+  if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
     return res.status(400).json({
       error: 'invalid_request',
       error_description: 'PKCE endpoint does not use client authentication',
@@ -854,7 +842,7 @@ function validateBasicAuth(req, config) {
   const oauth2Config = config.credentials.oauth2;
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
+  if (!authHeader || !authHeader.toLowerCase().startsWith('basic ')) {
     return { valid: false, error: 'Missing Basic authentication header' };
   }
 
@@ -953,7 +941,7 @@ function validateClientAuthentication(req, config) {
   // Auto-detect authentication method based on what's provided in the request
 
   // 1. Check for Basic Auth header first
-  if (authHeader && authHeader.startsWith('Basic ')) {
+  if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
     try {
       const base64 = authHeader.split(' ')[1];
       const decoded = Buffer.from(base64, 'base64').toString('utf8');

@@ -728,19 +728,16 @@ function formatScopes(scopes, delimiter) {
 }
 
 /**
- * Validate Basic Auth - STRICT (header only, no body)
+ * Validate Basic Auth - STRICT (header required, body params allowed)
  */
 function validateBasicAuth(req) {
   const authHeader = req.headers.authorization;
   const config = configManager.getConfig();
   const oauth2Config = config.credentials.oauth2;
 
-  // Reject if credentials in body
-  if (req.body.client_secret) {
-    return { valid: false, error: 'Client Secret Basic requires credentials in Authorization header, not body' };
-  }
+  // Note: client_secret in body is allowed alongside Basic auth header
 
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
+  if (!authHeader || !authHeader.toLowerCase().startsWith('basic ')) {
     return { valid: false, error: 'Missing Basic Authorization header' };
   }
 
@@ -768,7 +765,7 @@ function validatePostAuth(req) {
   const oauth2Config = config.credentials.oauth2;
 
   // Reject if Basic auth header present
-  if (authHeader && authHeader.startsWith('Basic ')) {
+  if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
     return { valid: false, error: 'Client Secret Post requires credentials in body, not Authorization header' };
   }
 
@@ -794,7 +791,7 @@ function validateJWTAuth(req) {
   const oauth2Config = config.credentials.oauth2;
 
   // Reject if Basic auth header present
-  if (authHeader && authHeader.startsWith('Basic ')) {
+  if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
     return { valid: false, error: 'Client Secret JWT requires client_assertion, not Basic Authorization header' };
   }
 
@@ -842,7 +839,7 @@ function validateNoneAuth(req, requirePKCE = true) {
   const oauth2Config = config.credentials.oauth2;
 
   // Reject if any authentication is present
-  if (authHeader && authHeader.startsWith('Basic ')) {
+  if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
     return { valid: false, error: 'None authentication does not allow Authorization header' };
   }
 

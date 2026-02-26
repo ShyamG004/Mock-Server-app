@@ -32,7 +32,7 @@ router.get('/header', (req, res) => {
   const authHeader = req.headers.authorization;
 
   // STRICT: Check Authorization header
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
+  if (!authHeader || !authHeader.toLowerCase().startsWith('basic ')) {
     return res.status(401).json({
       status: 'failure',
       message: 'Missing Basic Authorization header',
@@ -280,7 +280,7 @@ function validateBasicAuth(req, res, next) {
     });
   }
 
-  if (!authHeader.startsWith('Basic ')) {
+  if (!authHeader.toLowerCase().startsWith('basic ')) {
     result.status = 'failure';
     result.errors.push('Invalid Authorization header format');
     return res.status(401).json({

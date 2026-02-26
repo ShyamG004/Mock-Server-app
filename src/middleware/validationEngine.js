@@ -120,7 +120,7 @@ function validateApiKey(req, config, result) {
 function validateBasicAuth(req, config, result) {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
+  if (!authHeader || !authHeader.toLowerCase().startsWith('basic ')) {
     result.errors.push('Missing or invalid Authorization header');
     result.valid = false;
     return;
@@ -277,7 +277,7 @@ function validateClientAuth(req, config, result) {
 
   switch (config.clientAuthMethod) {
     case 'Client Secret Basic':
-      if (!authHeader || !authHeader.startsWith('Basic ')) {
+      if (!authHeader || !authHeader.toLowerCase().startsWith('basic ')) {
         result.errors.push('Client Secret Basic auth required but not provided');
         result.valid = false;
       } else {
