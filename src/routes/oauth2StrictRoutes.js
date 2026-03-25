@@ -43,7 +43,9 @@ const redirectUriStore = {
     'https://vimal-17786t.csez.zohocorpin.com:443/applicationOauthRedirect',
     'https://vimal-17786t.csez.zohocorpin.com/applicationOauthRedirect',
     'https://log360cloud-d3.localzoho.com:8443/applicationOauthRedirect',
-    'https://log360cloud-d3.localzoho.com/applicationOauthRedirect'
+    'https://log360cloud-d3.localzoho.com/applicationOauthRedirect'.
+    'https://sarathy-15578-t.csez.zohocorpin.com/applicationOauthRedirect',
+    'https://sarathy-15578-t.csez.zohocorpin.com:443/applicationOauthRedirect'
   ])
 };
 
