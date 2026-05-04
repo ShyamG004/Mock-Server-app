@@ -1270,7 +1270,7 @@ function handleClientCredentialsGrant(req, res, clientAuth, scopeDelimiter) {
     access_token: accessToken,
     token_type: 'Bearer',
     expires_in: 3600,
-    scope: formatScopes(scopes, scopeDelimiter),
+    scope: scopes.join(' '),
     scope_delimiter: scopeDelimiter
   });
 }

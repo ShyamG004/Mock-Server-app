@@ -611,7 +611,7 @@ function handleClientCredentialsGrant(req, res, config, clientAuth) {
     access_token: tokens.accessToken,
     token_type: 'Bearer',
     expires_in: parseInt(process.env.TOKEN_EXPIRY_SECONDS) || 3600,
-    scope: configManager.formatScopes(scopes),
+    scope: scopes.join(' '),
     status: 'success',
     message: 'Token issued successfully',
     details: {
