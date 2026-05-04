@@ -1072,7 +1072,7 @@ function createAuthorizeEndpoint(scopeDelimiter, requirePKCE = false) {
         details: {
           code: authCode,
           state,
-          scope: formatScopes(scopes, scopeDelimiter),
+          scope: scopes.join(' '),
           scopeDelimiter,
           expires_in: 600,
           redirect_uri
@@ -1243,7 +1243,7 @@ function handleAuthCodeGrant(req, res, clientAuth, scopeDelimiter, code_verifier
     token_type: 'Bearer',
     expires_in: 3600,
     refresh_token: refreshToken,
-    scope: formatScopes(codeData.scopes, scopeDelimiter),
+    scope: codeData.scopes.join(' '),
     scope_delimiter: scopeDelimiter
   });
 }
@@ -1313,7 +1313,7 @@ function handleRefreshTokenGrant(req, res, clientAuth, scopeDelimiter) {
     access_token: newAccessToken,
     token_type: 'Bearer',
     expires_in: 3600,
-    scope: formatScopes(tokenData.scopes, scopeDelimiter),
+    scope: tokenData.scopes.join(' '),
     scope_delimiter: scopeDelimiter
   });
 }
@@ -1343,7 +1343,7 @@ function createTestHeaderEndpoint(scopeDelimiter) {
       details: {
         tokenPlacement: 'header',
         scopeDelimiter,
-        scopes: formatScopes(tokenResult.tokenData.scopes, scopeDelimiter),
+        scopes: tokenResult.tokenData.scopes.join(' '),
         authMethod: tokenResult.tokenData.authMethod,
         expiresIn: Math.floor((tokenResult.tokenData.expiresAt - Date.now()) / 1000)
       }
@@ -1376,7 +1376,7 @@ function createTestQueryEndpoint(scopeDelimiter) {
       details: {
         tokenPlacement: 'query',
         scopeDelimiter,
-        scopes: formatScopes(tokenResult.tokenData.scopes, scopeDelimiter),
+        scopes: tokenResult.tokenData.scopes.join(' '),
         authMethod: tokenResult.tokenData.authMethod,
         expiresIn: Math.floor((tokenResult.tokenData.expiresAt - Date.now()) / 1000)
       }

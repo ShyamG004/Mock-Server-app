@@ -176,7 +176,7 @@ router.get('/authorize', (req, res) => {
       code: authCode,
       state,
       redirect_uri,
-      scope: configManager.formatScopes(scopes),
+      scope: scopes.join(' '),
       expires_in: 600
     }
   });
@@ -578,7 +578,7 @@ function handleAuthorizationCodeGrant(req, res, config, clientAuth) {
     token_type: 'Bearer',
     expires_in: parseInt(process.env.TOKEN_EXPIRY_SECONDS) || 3600,
     refresh_token: tokens.refreshToken,
-    scope: configManager.formatScopes(codeData.scopes),
+    scope: codeData.scopes.join(' '),
     status: 'success',
     message: 'Token issued successfully',
     details: {
@@ -678,7 +678,7 @@ function handleRefreshTokenGrant(req, res, config, clientAuth) {
     token_type: 'Bearer',
     expires_in: parseInt(process.env.TOKEN_EXPIRY_SECONDS) || 3600,
     refresh_token: tokens.refreshToken,
-    scope: configManager.formatScopes(scopes),
+    scope: scopes.join(' '),
     status: 'success',
     message: 'Token refreshed successfully',
     details: {
@@ -722,7 +722,7 @@ router.post('/introspect', (req, res) => {
   if (accessTokenData && Date.now() < accessTokenData.expiresAt) {
     return res.json({
       active: true,
-      scope: configManager.formatScopes(accessTokenData.scopes),
+      scope: accessTokenData.scopes.join(' '),
       client_id: accessTokenData.clientId,
       token_type: 'Bearer',
       exp: Math.floor(accessTokenData.expiresAt / 1000),
@@ -735,7 +735,7 @@ router.post('/introspect', (req, res) => {
   if (refreshTokenData && Date.now() < refreshTokenData.expiresAt) {
     return res.json({
       active: true,
-      scope: configManager.formatScopes(refreshTokenData.scopes),
+      scope: refreshTokenData.scopes.join(' '),
       client_id: refreshTokenData.clientId,
       token_type: 'refresh_token',
       exp: Math.floor(refreshTokenData.expiresAt / 1000),
