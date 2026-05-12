@@ -49,7 +49,14 @@ const redirectUriStore = {
     'https://logqa-u22-6.csez.zohocorpin.com/applicationOauthRedirect',
     'https://logqa-u22-6.csez.zohocorpin.com:443/applicationOauthRedirect',
     'https://log360cloud-s1.localmanageengine.com/applicationOauthRedirect',
-    'https://log360cloud-s1.localmanageengine.com:443/applicationOauthRedirect'
+    'https://log360cloud-s1.localmanageengine.com:443/applicationOauthRedirect',
+    'https://log360cloud.manageengine.com.au/applicationOauthRedirect',
+    'https://log360cloud.manageengine.in/applicationOauthRedirect',
+    'https://log360cloud.manageengine.com/applicationOauthRedirect',
+    'https://log360cloud.manageengine.ca/applicationOauthRedirect',
+    'https://log360cloud.manageengine.eu/applicationOauthRedirect',
+    'https://log360cloud.manageengine.uk/applicationOauthRedirect',
+    'https://log360cloud.manageengine.jp/applicationOauthRedirect'
   ])
 };
 
@@ -234,6 +241,13 @@ router.post('/redirect-uris/reset', (req, res) => {
   redirectUriStore.uris.add('https://logqa-u22-6.csez.zohocorpin.com/applicationOauthRedirect');
   redirectUriStore.uris.add('https://log360cloud-s1.localmanageengine.com/applicationOauthRedirect');
   redirectUriStore.uris.add('https://log360cloud-s1.localmanageengine.com:443/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://log360cloud.manageengine.com.au/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://log360cloud.manageengine.in/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://log360cloud.manageengine.com/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://log360cloud.manageengine.ca/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://log360cloud.manageengine.eu/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://log360cloud.manageengine.uk/applicationOauthRedirect');
+  redirectUriStore.uris.add('https://log360cloud.manageengine.jp/applicationOauthRedirect');
 
   res.json({
     status: 'success',

@@ -16,6 +16,21 @@
  * - /api-key/header/with-all-json         - API key + headers + query + JSON body
  * - /api-key/header/with-all-urlencoded   - API key + headers + query + urlencoded body
  *
+ * QUERY + ADDITIONAL COMPULSORY PARAMS (mirror of header matrix):
+ * - /api-key/query/with-headers
+ * - /api-key/query/with-query
+ * - /api-key/query/with-body-json
+ * - /api-key/query/with-body-json-nested
+ * - /api-key/query/with-body-urlencoded
+ * - /api-key/query/with-all-json
+ * - /api-key/query/with-all-urlencoded
+ *
+ * FORM + ADDITIONAL COMPULSORY PARAMS (4 endpoints — body location is the form):
+ * - /api-key/form/with-headers     - API key in form body + extra required headers
+ * - /api-key/form/with-query       - API key in form body + extra required query params
+ * - /api-key/form/with-body-extra  - API key in form body + additional required form fields
+ * - /api-key/form/with-all         - API key in form + headers + query + extra form fields
+ *
  * AUTO-DETECT ENDPOINTS (backward compatible):
  * - /api-key/test - Auto-detect location
  */
@@ -767,6 +782,528 @@ router.post('/header/with-all-urlencoded', (req, res) => {
         header: ['apiKey', ...Object.keys(REQUIRED_ADDITIONAL_HEADERS)],
         query: Object.keys(REQUIRED_ADDITIONAL_QUERY),
         body: Object.keys(REQUIRED_BODY_FLAT)
+      },
+      endpoint
+    }
+  });
+});
+
+// =============================================================================
+// QUERY + ADDITIONAL COMPULSORY PARAMS
+// API key MUST be in the query string. Mirrors the header matrix.
+// =============================================================================
+
+function validateApiKeyInQueryOnly(req) {
+  const config = configManager.getConfig();
+  const expectedKey = config.credentials.apiKey.keys[0];
+
+  if (req.headers[expectedKey.name.toLowerCase()]) {
+    return {
+      error: 'API key must be in query only — found in header',
+      hint: `Remove ${expectedKey.name} header, send as query param instead`
+    };
+  }
+  if (findKeyInsensitive(req.body, expectedKey.name)) {
+    return {
+      error: 'API key must be in query only — found in body',
+      hint: `Remove ${expectedKey.name} from body, send as query param instead`
+    };
+  }
+
+  const queryKey = findKeyInsensitive(req.query, expectedKey.name);
+  if (queryKey === undefined) {
+    return {
+      error: `Missing API key in query: ${expectedKey.name}`,
+      hint: `Add ?${expectedKey.name}=<value> to URL`,
+      status: 401
+    };
+  }
+  if (queryKey !== expectedKey.value) {
+    return { error: 'Invalid API key value', status: 401 };
+  }
+  return { ok: true, expectedKey };
+}
+
+/**
+ * @swagger
+ * /api-key/query/with-headers:
+ *   get:
+ *     summary: API key (query) + additional compulsory headers
+ *     tags: [API Key]
+ */
+router.get('/query/with-headers', (req, res) => {
+  const endpoint = '/api-key/query/with-headers';
+  const auth = validateApiKeyInQueryOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const headerCheck = checkRequiredHeaders(req, REQUIRED_ADDITIONAL_HEADERS);
+  if (headerCheck.missing.length || headerCheck.wrong.length) {
+    return paramsFail(res, endpoint, 'header', REQUIRED_ADDITIONAL_HEADERS, headerCheck);
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (query) + additional headers validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'query',
+      validated: ['apiKey', ...Object.keys(REQUIRED_ADDITIONAL_HEADERS)],
+      endpoint
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api-key/query/with-query:
+ *   get:
+ *     summary: API key (query) + additional compulsory query params
+ *     tags: [API Key]
+ */
+router.get('/query/with-query', (req, res) => {
+  const endpoint = '/api-key/query/with-query';
+  const auth = validateApiKeyInQueryOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const queryCheck = checkRequiredQuery(req, REQUIRED_ADDITIONAL_QUERY);
+  if (queryCheck.missing.length || queryCheck.wrong.length) {
+    return paramsFail(res, endpoint, 'query', REQUIRED_ADDITIONAL_QUERY, queryCheck);
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (query) + additional query params validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'query',
+      validated: ['apiKey', ...Object.keys(REQUIRED_ADDITIONAL_QUERY)],
+      endpoint
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api-key/query/with-body-json:
+ *   post:
+ *     summary: API key (query) + required JSON body (flat / single layer)
+ *     tags: [API Key]
+ */
+router.post('/query/with-body-json', (req, res) => {
+  const endpoint = '/api-key/query/with-body-json';
+  if (!requireContentType(req, 'application/json')) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'This endpoint requires Content-Type: application/json',
+      details: { endpoint, receivedContentType: req.headers['content-type'] || '' }
+    });
+  }
+
+  const auth = validateApiKeyInQueryOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const bodyCheck = checkFlatBody(req.body, REQUIRED_BODY_FLAT);
+  if (bodyCheck.missing.length || bodyCheck.wrong.length) {
+    return paramsFail(res, endpoint, 'body (json, flat)', REQUIRED_BODY_FLAT, bodyCheck);
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (query) + flat JSON body validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'query',
+      bodyShape: 'flat',
+      validated: ['apiKey', ...Object.keys(REQUIRED_BODY_FLAT)],
+      endpoint
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api-key/query/with-body-json-nested:
+ *   post:
+ *     summary: API key (query) + required JSON body (multi-layer / nested)
+ *     tags: [API Key]
+ */
+router.post('/query/with-body-json-nested', (req, res) => {
+  const endpoint = '/api-key/query/with-body-json-nested';
+  if (!requireContentType(req, 'application/json')) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'This endpoint requires Content-Type: application/json',
+      details: { endpoint, receivedContentType: req.headers['content-type'] || '' }
+    });
+  }
+
+  const auth = validateApiKeyInQueryOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const bodyCheck = checkNestedBody(req.body, REQUIRED_BODY_NESTED);
+  if (bodyCheck.missing.length || bodyCheck.wrong.length) {
+    return paramsFail(res, endpoint, 'body (json, nested)', REQUIRED_BODY_NESTED, bodyCheck);
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (query) + nested JSON body validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'query',
+      bodyShape: 'nested',
+      validatedPaths: [
+        'apiKey',
+        'user.id',
+        'user.profile.name',
+        'user.profile.email',
+        'metadata.source',
+        'metadata.version'
+      ],
+      endpoint
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api-key/query/with-body-urlencoded:
+ *   post:
+ *     summary: API key (query) + required x-www-form-urlencoded body
+ *     tags: [API Key]
+ */
+router.post('/query/with-body-urlencoded', (req, res) => {
+  const endpoint = '/api-key/query/with-body-urlencoded';
+  if (!requireContentType(req, 'application/x-www-form-urlencoded')) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'This endpoint requires Content-Type: application/x-www-form-urlencoded',
+      details: { endpoint, receivedContentType: req.headers['content-type'] || '' }
+    });
+  }
+
+  const auth = validateApiKeyInQueryOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const bodyCheck = checkFlatBody(req.body, REQUIRED_BODY_FLAT);
+  if (bodyCheck.missing.length || bodyCheck.wrong.length) {
+    return paramsFail(res, endpoint, 'body (urlencoded)', REQUIRED_BODY_FLAT, bodyCheck);
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (query) + urlencoded body validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'query',
+      bodyShape: 'urlencoded',
+      validated: ['apiKey', ...Object.keys(REQUIRED_BODY_FLAT)],
+      endpoint
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api-key/query/with-all-json:
+ *   post:
+ *     summary: API key (query) + headers + query + JSON body (all required)
+ *     tags: [API Key]
+ */
+router.post('/query/with-all-json', (req, res) => {
+  const endpoint = '/api-key/query/with-all-json';
+  if (!requireContentType(req, 'application/json')) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'This endpoint requires Content-Type: application/json',
+      details: { endpoint, receivedContentType: req.headers['content-type'] || '' }
+    });
+  }
+
+  const auth = validateApiKeyInQueryOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const headerCheck = checkRequiredHeaders(req, REQUIRED_ADDITIONAL_HEADERS);
+  const queryCheck = checkRequiredQuery(req, REQUIRED_ADDITIONAL_QUERY);
+  const bodyCheck = checkFlatBody(req.body, REQUIRED_BODY_FLAT);
+
+  const failures = {};
+  if (headerCheck.missing.length || headerCheck.wrong.length) failures.header = headerCheck;
+  if (queryCheck.missing.length || queryCheck.wrong.length) failures.query = queryCheck;
+  if (bodyCheck.missing.length || bodyCheck.wrong.length) failures.body = bodyCheck;
+
+  if (Object.keys(failures).length) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'Missing or invalid required params across one or more locations',
+      details: {
+        endpoint,
+        expected: {
+          header: REQUIRED_ADDITIONAL_HEADERS,
+          query: REQUIRED_ADDITIONAL_QUERY,
+          body: REQUIRED_BODY_FLAT
+        },
+        failures
+      }
+    });
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (query) + headers + query + JSON body validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'query',
+      validated: {
+        header: Object.keys(REQUIRED_ADDITIONAL_HEADERS),
+        query: ['apiKey', ...Object.keys(REQUIRED_ADDITIONAL_QUERY)],
+        body: Object.keys(REQUIRED_BODY_FLAT)
+      },
+      endpoint
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api-key/query/with-all-urlencoded:
+ *   post:
+ *     summary: API key (query) + headers + query + urlencoded body (all required)
+ *     tags: [API Key]
+ */
+router.post('/query/with-all-urlencoded', (req, res) => {
+  const endpoint = '/api-key/query/with-all-urlencoded';
+  if (!requireContentType(req, 'application/x-www-form-urlencoded')) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'This endpoint requires Content-Type: application/x-www-form-urlencoded',
+      details: { endpoint, receivedContentType: req.headers['content-type'] || '' }
+    });
+  }
+
+  const auth = validateApiKeyInQueryOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const headerCheck = checkRequiredHeaders(req, REQUIRED_ADDITIONAL_HEADERS);
+  const queryCheck = checkRequiredQuery(req, REQUIRED_ADDITIONAL_QUERY);
+  const bodyCheck = checkFlatBody(req.body, REQUIRED_BODY_FLAT);
+
+  const failures = {};
+  if (headerCheck.missing.length || headerCheck.wrong.length) failures.header = headerCheck;
+  if (queryCheck.missing.length || queryCheck.wrong.length) failures.query = queryCheck;
+  if (bodyCheck.missing.length || bodyCheck.wrong.length) failures.body = bodyCheck;
+
+  if (Object.keys(failures).length) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'Missing or invalid required params across one or more locations',
+      details: {
+        endpoint,
+        expected: {
+          header: REQUIRED_ADDITIONAL_HEADERS,
+          query: REQUIRED_ADDITIONAL_QUERY,
+          body: REQUIRED_BODY_FLAT
+        },
+        failures
+      }
+    });
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (query) + headers + query + urlencoded body validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'query',
+      validated: {
+        header: Object.keys(REQUIRED_ADDITIONAL_HEADERS),
+        query: ['apiKey', ...Object.keys(REQUIRED_ADDITIONAL_QUERY)],
+        body: Object.keys(REQUIRED_BODY_FLAT)
+      },
+      endpoint
+    }
+  });
+});
+
+// =============================================================================
+// FORM + ADDITIONAL COMPULSORY PARAMS
+// API key MUST be in the form body. Body location is consumed by the form, so
+// only 4 endpoints: with-headers, with-query, with-body-extra, with-all.
+// =============================================================================
+
+function validateApiKeyInFormOnly(req) {
+  const config = configManager.getConfig();
+  const expectedKey = config.credentials.apiKey.keys[0];
+
+  if (req.headers[expectedKey.name.toLowerCase()]) {
+    return {
+      error: 'API key must be in form body only — found in header',
+      hint: `Remove ${expectedKey.name} header, send in form body instead`
+    };
+  }
+  if (findKeyInsensitive(req.query, expectedKey.name)) {
+    return {
+      error: 'API key must be in form body only — found in query',
+      hint: `Remove ${expectedKey.name} from query, send in form body instead`
+    };
+  }
+
+  const ct = req.headers['content-type'] || '';
+  if (!ct.includes('application/x-www-form-urlencoded') && !ct.includes('multipart/form-data')) {
+    return {
+      error: 'This endpoint requires form data',
+      hint: 'Set Content-Type: application/x-www-form-urlencoded or multipart/form-data'
+    };
+  }
+
+  const formKey = findKeyInsensitive(req.body, expectedKey.name);
+  if (formKey === undefined) {
+    return {
+      error: `Missing API key in form body: ${expectedKey.name}`,
+      hint: `Include ${expectedKey.name}=<value> in form data`,
+      status: 401
+    };
+  }
+  if (formKey !== expectedKey.value) {
+    return { error: 'Invalid API key value', status: 401 };
+  }
+  return { ok: true, expectedKey };
+}
+
+/**
+ * @swagger
+ * /api-key/form/with-headers:
+ *   post:
+ *     summary: API key (form body) + additional compulsory headers
+ *     tags: [API Key]
+ */
+router.post('/form/with-headers', (req, res) => {
+  const endpoint = '/api-key/form/with-headers';
+  const auth = validateApiKeyInFormOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const headerCheck = checkRequiredHeaders(req, REQUIRED_ADDITIONAL_HEADERS);
+  if (headerCheck.missing.length || headerCheck.wrong.length) {
+    return paramsFail(res, endpoint, 'header', REQUIRED_ADDITIONAL_HEADERS, headerCheck);
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (form) + additional headers validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'form',
+      validated: ['apiKey', ...Object.keys(REQUIRED_ADDITIONAL_HEADERS)],
+      endpoint
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api-key/form/with-query:
+ *   post:
+ *     summary: API key (form body) + additional compulsory query params
+ *     tags: [API Key]
+ */
+router.post('/form/with-query', (req, res) => {
+  const endpoint = '/api-key/form/with-query';
+  const auth = validateApiKeyInFormOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const queryCheck = checkRequiredQuery(req, REQUIRED_ADDITIONAL_QUERY);
+  if (queryCheck.missing.length || queryCheck.wrong.length) {
+    return paramsFail(res, endpoint, 'query', REQUIRED_ADDITIONAL_QUERY, queryCheck);
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (form) + additional query params validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'form',
+      validated: ['apiKey', ...Object.keys(REQUIRED_ADDITIONAL_QUERY)],
+      endpoint
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api-key/form/with-body-extra:
+ *   post:
+ *     summary: API key (form body) + additional required form fields
+ *     tags: [API Key]
+ */
+router.post('/form/with-body-extra', (req, res) => {
+  const endpoint = '/api-key/form/with-body-extra';
+  const auth = validateApiKeyInFormOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const bodyCheck = checkFlatBody(req.body, REQUIRED_BODY_FLAT);
+  if (bodyCheck.missing.length || bodyCheck.wrong.length) {
+    return paramsFail(res, endpoint, 'form body', REQUIRED_BODY_FLAT, bodyCheck);
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (form) + additional form fields validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'form',
+      validated: ['apiKey', ...Object.keys(REQUIRED_BODY_FLAT)],
+      endpoint
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api-key/form/with-all:
+ *   post:
+ *     summary: API key (form) + headers + query + extra form fields (all required)
+ *     tags: [API Key]
+ */
+router.post('/form/with-all', (req, res) => {
+  const endpoint = '/api-key/form/with-all';
+  const auth = validateApiKeyInFormOnly(req);
+  if (!auth.ok) return authFail(res, endpoint, auth);
+
+  const headerCheck = checkRequiredHeaders(req, REQUIRED_ADDITIONAL_HEADERS);
+  const queryCheck = checkRequiredQuery(req, REQUIRED_ADDITIONAL_QUERY);
+  const bodyCheck = checkFlatBody(req.body, REQUIRED_BODY_FLAT);
+
+  const failures = {};
+  if (headerCheck.missing.length || headerCheck.wrong.length) failures.header = headerCheck;
+  if (queryCheck.missing.length || queryCheck.wrong.length) failures.query = queryCheck;
+  if (bodyCheck.missing.length || bodyCheck.wrong.length) failures.body = bodyCheck;
+
+  if (Object.keys(failures).length) {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'Missing or invalid required params across one or more locations',
+      details: {
+        endpoint,
+        expected: {
+          header: REQUIRED_ADDITIONAL_HEADERS,
+          query: REQUIRED_ADDITIONAL_QUERY,
+          body: REQUIRED_BODY_FLAT
+        },
+        failures
+      }
+    });
+  }
+
+  res.json({
+    status: 'success',
+    message: 'API Key (form) + headers + query + form body validated',
+    details: {
+      authType: 'API Key',
+      apiKeyLocation: 'form',
+      validated: {
+        header: Object.keys(REQUIRED_ADDITIONAL_HEADERS),
+        query: Object.keys(REQUIRED_ADDITIONAL_QUERY),
+        body: ['apiKey', ...Object.keys(REQUIRED_BODY_FLAT)]
       },
       endpoint
     }
