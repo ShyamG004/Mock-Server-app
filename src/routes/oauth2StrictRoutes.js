@@ -57,7 +57,8 @@ const redirectUriStore = {
     'https://log360cloud.manageengine.eu/applicationOauthRedirect',
     'https://log360cloud.manageengine.uk/applicationOauthRedirect',
     'https://log360cloud.manageengine.jp/applicationOauthRedirect'
-  ])
+  ]),
+  strictValidation: false // Non-strict by default: any redirect_uri is accepted. Toggle via PUT /oauth2/redirect-uris/validation
 };
 
 // =============================================================================
@@ -90,7 +91,8 @@ router.get('/redirect-uris', (req, res) => {
     message: 'Registered redirect URIs',
     data: {
       redirectUris: Array.from(redirectUriStore.uris),
-      count: redirectUriStore.uris.size
+      count: redirectUriStore.uris.size,
+      strictValidation: redirectUriStore.strictValidation
     }
   });
 });
@@ -255,6 +257,35 @@ router.post('/redirect-uris/reset', (req, res) => {
     data: {
       redirectUris: Array.from(redirectUriStore.uris),
       count: redirectUriStore.uris.size
+    }
+  });
+});
+
+/**
+ * PUT /oauth2/redirect-uris/validation - Toggle strict redirect URI validation
+ *
+ * strict=true  -> redirect_uri must be in the registered allowlist
+ * strict=false -> any redirect_uri is accepted (default)
+ */
+router.put('/redirect-uris/validation', (req, res) => {
+  const { strict } = req.body;
+
+  if (typeof strict !== 'boolean') {
+    return res.status(400).json({
+      status: 'failure',
+      message: 'Missing or invalid strict value in request body',
+      hint: 'Send { "strict": true } or { "strict": false }'
+    });
+  }
+
+  redirectUriStore.strictValidation = strict;
+
+  res.json({
+    status: 'success',
+    message: `Strict redirect URI validation ${strict ? 'enabled' : 'disabled'}`,
+    data: {
+      strictValidation: redirectUriStore.strictValidation,
+      registeredRedirectUris: Array.from(redirectUriStore.uris)
     }
   });
 });
@@ -612,6 +643,11 @@ function isValidRedirectUri(uri) {
 function validateRedirectUri(uri) {
   if (!uri) {
     return { valid: false, error: 'Missing redirect_uri parameter' };
+  }
+
+  // Non-strict mode (default): accept any redirect_uri, only presence is required
+  if (!redirectUriStore.strictValidation) {
+    return { valid: true };
   }
 
   // Check exact match first
@@ -1489,7 +1525,8 @@ router.get('/endpoints', (req, res) => {
       add: 'POST /oauth2/redirect-uris { "redirect_uri": "..." }',
       update: 'PUT /oauth2/redirect-uris { "old_redirect_uri": "...", "new_redirect_uri": "..." }',
       remove: 'DELETE /oauth2/redirect-uris { "redirect_uri": "..." }',
-      reset: 'POST /oauth2/redirect-uris/reset'
+      reset: 'POST /oauth2/redirect-uris/reset',
+      toggleValidation: 'PUT /oauth2/redirect-uris/validation { "strict": true/false }'
     },
     scopeManagement: {
       list: 'GET /oauth2/scopes',
@@ -1536,6 +1573,7 @@ router.get('/endpoints', (req, res) => {
       (3 * 3 * 3),      // client-creds: 3 delimiters × 3 auth × 3
     registeredRedirectUris: Array.from(redirectUriStore.uris),
     registeredScopes: Array.from(scopeStore.scopes),
+    strictRedirectUriValidation: redirectUriStore.strictValidation,
     strictScopeValidation: scopeStore.strictValidation,
     endpoints,
     scopeDelimiters: {
