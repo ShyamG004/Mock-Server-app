@@ -7,7 +7,7 @@ A production-ready mock authentication server for testing all authentication typ
 - **Multiple Authentication Types**
   - API Key Authentication (Header, Query, Form Data, JSON Body)
   - Basic Authentication
-  - OAuth 1.0 (Request Token, Access Token, Signature Validation)
+  - OAuth 1.0 (Request Token, Access Token, real HMAC signature verification)
   - OAuth 2.0 (Authorization Code, PKCE, Client Credentials)
 
 - **Flexible Configuration**
@@ -20,6 +20,13 @@ A production-ready mock authentication server for testing all authentication typ
   - Dynamic parameter support
   - Scope validation with multiple delimiters
   - Client authentication method validation
+  - Distinct `Invalid Client ID` / `Invalid Client Secret` errors (OAuth2)
+  - Distinct `Invalid consumer key` / `Invalid Consumer Secret` errors (OAuth1)
+
+- **[Failure Simulation](#-failure-simulation)**
+  - Force timeouts, slow responses and hard error statuses at runtime
+  - Per-request overrides (`?_delay`, `?_status`, `x-mock-timeout`)
+  - Control endpoints stay reachable so the server is always recoverable
 
 - **Developer Experience**
   - Swagger/OpenAPI documentation
@@ -78,14 +85,24 @@ docker run -p 3000:3000 mock-auth-server
   "paramLocation": "header",
   "totalParams": 50,
   "dynamicParams": 10,
-  "totalScopes": 50
+  "totalScopes": 50,
+  "oauth1": {
+    "strictSignature": true
+  },
+  "simulation": {
+    "mode": "none",
+    "delayMs": 0,
+    "errorStatus": 500,
+    "errorMessage": "Simulated internal server error",
+    "applyTo": []
+  }
 }
 ```
 
 ### Runtime Configuration
 
 ```bash
-# Get current config
+# Get current config (includes the oauth1 and simulation blocks)
 curl http://localhost:3000/config
 
 # Update config
@@ -93,9 +110,114 @@ curl -X POST http://localhost:3000/config \
   -H "Content-Type: application/json" \
   -d '{"authType": "OAuth2", "grantType": "Client Credentials"}'
 
-# Reset to defaults
+# Reset to defaults (also clears any active failure simulation)
 curl -X POST http://localhost:3000/config/reset
 ```
+
+## 🧨 Failure Simulation
+
+Force backend failures so a client's error alerts can be verified end to end.
+Two independent controls: a **global** `simulation` block set at runtime, and
+**per-request overrides** for one-off tests.
+
+`/config`, `/health`, `/ui` and `/api-docs` are **never** simulated, so the
+server always stays controllable and recoverable.
+
+### Global configuration
+
+```json
+{
+  "simulation": {
+    "mode": "none | timeout | error | delay",
+    "delayMs": 0,
+    "errorStatus": 500,
+    "errorMessage": "Simulated internal server error",
+    "applyTo": ["/oauth2", "/oauth1", "/apikey", "/basic", "/protected"]
+  }
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `mode` | `none` disabled · `timeout` hold the request open and never respond · `delay` wait `delayMs` then handle normally · `error` respond immediately with `errorStatus` |
+| `delayMs` | Delay in ms, `0`–`300000` (capped). With `mode: timeout` and `delayMs > 0` the socket is destroyed after that delay instead of hanging forever |
+| `errorStatus` | Status for `mode: error`, must be `400`–`599` |
+| `errorMessage` | Message body for `mode: error` |
+| `applyTo` | Route prefixes to affect. Empty or omitted = **all** non-control routes |
+
+Forced-error responses use the standard failure shape:
+
+```json
+{ "status": "failure", "message": "Simulated internal server error" }
+```
+
+Every simulated failure is logged through `src/utils/logger.js` with its mode
+and path.
+
+### Examples
+
+```bash
+# --- Forced 503 on every auth endpoint -------------------------------------
+curl -X POST http://localhost:3000/config \
+  -H "Content-Type: application/json" \
+  -d '{"simulation": {"mode": "error", "errorStatus": 503}}'
+
+curl -i -X POST http://localhost:3000/token \
+  -u test_client_id:test_client_secret \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials"
+# HTTP/1.1 503  {"status":"failure","message":"Simulated internal server error"}
+
+curl http://localhost:3000/health     # still 200 - control routes are exempt
+curl -X POST http://localhost:3000/config/reset   # clears the simulation
+
+# --- Hang every OAuth2 request (no response ever) --------------------------
+curl -X POST http://localhost:3000/config \
+  -H "Content-Type: application/json" \
+  -d '{"simulation": {"mode": "timeout", "applyTo": ["/oauth2"]}}'
+
+curl --max-time 10 http://localhost:3000/oauth2/introspect   # client times out
+
+# --- Hang, then drop the connection after 30s ------------------------------
+curl -X POST http://localhost:3000/config \
+  -H "Content-Type: application/json" \
+  -d '{"simulation": {"mode": "timeout", "delayMs": 30000}}'
+
+# --- Slow down every auth endpoint by 5 seconds ----------------------------
+curl -X POST http://localhost:3000/config \
+  -H "Content-Type: application/json" \
+  -d '{"simulation": {"mode": "delay", "delayMs": 5000}}'
+```
+
+### Per-request overrides
+
+These work even while `simulation.mode` is `none`, and affect only that one
+request — no config change and no cleanup needed.
+
+| Override | Effect |
+|----------|--------|
+| `?_delay=<ms>` | Delay that single request (`0`–`300000`) then handle it normally |
+| `?_status=<400-599>` | Respond immediately with that status and `{"status":"failure","message":"Simulated error via _status"}` |
+| `x-mock-timeout: true` | Hang that single request (no response). Add `?_delay=<ms>` to destroy the socket after that delay |
+
+```bash
+# Delay exactly one request by 5 seconds
+curl -w "\ntotal: %{time_total}s\n" \
+  "http://localhost:3000/api-key/test?_delay=5000" \
+  -H "X-API-Key: test_api_key_12345"
+
+# Force a 502 on exactly one request
+curl -i "http://localhost:3000/basic/test?_status=502" \
+  -u testuser:testpass123
+# HTTP/1.1 502  {"status":"failure","message":"Simulated error via _status"}
+
+# Hang exactly one request (curl gives up after 10s, the server never answers)
+curl --max-time 10 http://localhost:3000/protected \
+  -H "x-mock-timeout: true"
+```
+
+A `_delay` or `_status` outside its allowed range is rejected with `400` rather
+than silently clamped, so a typo in a test never looks like a passing case.
 
 ### Environment Variables
 
@@ -268,28 +390,104 @@ Authorization: OAuth
 | `/oauth1/test` | POST | Test OAuth1 authentication |
 | `/oauth1/echo` | POST | Debug endpoint (echoes OAuth params) |
 
-#### Test Commands
+#### Consumer Secret Validation (real signatures)
+
+`oauth_signature` is verified for real against the configured
+`credentials.oauth1.consumerSecret`, following RFC 5849:
+
+- the signature base string is `METHOD & percentEncode(url) & percentEncode(sorted params)`
+- the signing key is `percentEncode(consumerSecret) & percentEncode(tokenSecret)`
+- `HMAC-SHA1` and `HMAC-SHA256` are computed with Node's built-in `crypto`
+- `PLAINTEXT` is compared directly against `consumerSecret&tokenSecret`
+
+The consumer **key** is always checked **first**, so a wrong key never shows up
+as a secret problem:
+
+| Situation | Status | Response |
+|-----------|--------|----------|
+| Wrong `oauth_consumer_key` | 401 | `message: "OAuth1 signature validation failed"`, with `Invalid consumer key` in `details.errors` |
+| Correct key, signature does not match the consumer secret | 401 | `message: "Invalid Consumer Secret"` |
+| Correct key + correct secret | 200 | success |
+
+The 401 body for a secret mismatch includes `details.expectedSignature` and
+`details.signatureBaseString` to make debugging a client's signing code easy.
+
+##### Turning it off
+
+Set `oauth1.strictSignature` to `false` to restore the old mock behaviour where
+any non-empty signature is accepted — useful for clients that send a dummy
+signature:
 
 ```bash
-# Get request token
-curl -X POST http://localhost:3000/oauth1/request-token \
-  -H 'Authorization: OAuth oauth_consumer_key="mock_consumer_key", oauth_nonce="abc123", oauth_timestamp="'$(date +%s)'", oauth_signature_method="HMAC-SHA1", oauth_signature="mock_sig", oauth_version="1.0"'
+curl -X POST http://localhost:3000/config \
+  -H "Content-Type: application/json" \
+  -d '{"oauth1": {"strictSignature": false}}'
+```
 
-# Test with valid signature
-curl -X POST http://localhost:3000/oauth1/test \
-  -H 'Authorization: OAuth oauth_consumer_key="mock_consumer_key", oauth_nonce="xyz789", oauth_timestamp="'$(date +%s)'", oauth_signature_method="HMAC-SHA1", oauth_signature="valid_sig", oauth_version="1.0"'
+The flag is returned by `GET /config` and is reset to `true` by
+`POST /config/reset`.
 
-# Test expired timestamp (expect 401)
-curl -X POST http://localhost:3000/oauth1/test \
-  -H 'Authorization: OAuth oauth_consumer_key="mock_consumer_key", oauth_nonce="abc", oauth_timestamp="1000000000", oauth_signature_method="HMAC-SHA1", oauth_signature="sig", oauth_version="1.0"'
+##### Behind a reverse proxy (Render)
 
-# Test invalid consumer key (expect 401)
-curl -X POST http://localhost:3000/oauth1/test \
-  -H 'Authorization: OAuth oauth_consumer_key="wrong_key", oauth_nonce="abc", oauth_timestamp="'$(date +%s)'", oauth_signature_method="HMAC-SHA1", oauth_signature="sig", oauth_version="1.0"'
+The signature base string embeds the **client-facing** URL. Behind a TLS
+terminator the socket-level scheme and host are the internal ones, so the base
+URL is rebuilt from `x-forwarded-proto` and `x-forwarded-host` (first value of
+the chain), lowercased, with the default port for the scheme dropped. The
+direct `Host` value is also tried as a fallback, so a signature stays valid
+whether the client signed `https://<app>.onrender.com/...` or the internal URL.
+`app.set('trust proxy', true)` is enabled in `src/server.js` for the same
+reason.
 
-# Echo request for debugging
-curl -X POST http://localhost:3000/oauth1/echo \
-  -H 'Authorization: OAuth oauth_consumer_key="mock_consumer_key", oauth_nonce="test", oauth_timestamp="'$(date +%s)'", oauth_signature_method="HMAC-SHA1", oauth_signature="test", oauth_version="1.0"'
+#### Test Commands
+
+Signatures have to be computed, so the shell examples below use a small helper.
+`test-examples.ps1` has ready-made PowerShell equivalents
+(`Test-OAuth1-ValidSignature`, `Test-OAuth1-InvalidConsumerSecret`, ...), and
+the Test UI at `/ui` signs its OAuth1 requests in the browser.
+
+```bash
+BASE_URL=http://localhost:3000
+CONSUMER_KEY=mock_consumer_key
+CONSUMER_SECRET=mock_consumer_secret
+
+# Build a signed OAuth1 Authorization header for METHOD + URL
+oauth1_header() {
+  local method="$1" url="$2" secret="${3:-$CONSUMER_SECRET}" key="${4:-$CONSUMER_KEY}"
+  local ts nonce params base sig
+  ts=$(date +%s)
+  nonce=$(openssl rand -hex 16)
+  # Parameters must be sorted by name
+  params="oauth_consumer_key=${key}&oauth_nonce=${nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=${ts}&oauth_version=1.0"
+  base="POST&$(printf %s "$url" | jq -sRr @uri)&$(printf %s "$params" | jq -sRr @uri)"
+  [ "$method" = "GET" ] && base="GET&${base#POST&}"
+  sig=$(printf %s "$base" | openssl dgst -sha1 -hmac "${secret}&" -binary | base64)
+  printf 'OAuth oauth_consumer_key="%s", oauth_nonce="%s", oauth_signature_method="HMAC-SHA1", oauth_timestamp="%s", oauth_version="1.0", oauth_signature="%s"' \
+    "$key" "$nonce" "$ts" "$(printf %s "$sig" | jq -sRr @uri)"
+}
+
+# Get request token (signing key is "consumerSecret&" - no token secret yet)
+curl -X POST "$BASE_URL/oauth1/request-token" \
+  -H "Authorization: $(oauth1_header POST "$BASE_URL/oauth1/request-token")"
+
+# Valid signature (expect 200)
+curl -X POST "$BASE_URL/oauth1/test" \
+  -H "Authorization: $(oauth1_header POST "$BASE_URL/oauth1/test")"
+
+# Wrong consumer SECRET (expect 401 "Invalid Consumer Secret")
+curl -X POST "$BASE_URL/oauth1/test" \
+  -H "Authorization: $(oauth1_header POST "$BASE_URL/oauth1/test" wrong_secret)"
+
+# Wrong consumer KEY (expect 401 "Invalid consumer key" - checked first)
+curl -X POST "$BASE_URL/oauth1/test" \
+  -H "Authorization: $(oauth1_header POST "$BASE_URL/oauth1/test" "$CONSUMER_SECRET" wrong_key)"
+
+# Expired timestamp (expect 401)
+curl -X POST "$BASE_URL/oauth1/test" \
+  -H 'Authorization: OAuth oauth_consumer_key="mock_consumer_key", oauth_nonce="abc12345", oauth_timestamp="1000000000", oauth_signature_method="HMAC-SHA1", oauth_signature="sig", oauth_version="1.0"'
+
+# Echo request for debugging (no signature check on /echo)
+curl -X POST "$BASE_URL/oauth1/echo" \
+  -H 'Authorization: OAuth oauth_consumer_key="mock_consumer_key", oauth_nonce="test1234", oauth_timestamp="'$(date +%s)'", oauth_signature_method="HMAC-SHA1", oauth_signature="test", oauth_version="1.0"'
 ```
 
 ### OAuth 2.0 Token Endpoints
@@ -342,6 +540,65 @@ curl -X POST http://localhost:3000/token/post \
 # Response: 400 - "Authorization header not allowed for this endpoint"
 ```
 
+#### Invalid Client ID vs Invalid Client Secret
+
+Every OAuth2 token endpoint validates the **client_id first, then the
+client_secret**, and returns a different error for each. This applies to the
+Client Credentials grant and to the Authorization Code / PKCE token exchanges,
+on `/token`, `/token/basic`, `/token/post` and on all the strict
+`/oauth2/{grant}/{authMethod}/{delimiter}/token` endpoints.
+
+Wrong `client_id` → **401**:
+
+```json
+{
+  "error": "invalid_client",
+  "error_description": "Invalid Client ID",
+  "status": "failure",
+  "message": "Invalid Client ID"
+}
+```
+
+Correct `client_id`, wrong `client_secret` → **401**:
+
+```json
+{
+  "error": "invalid_client",
+  "error_description": "Invalid Client Secret",
+  "status": "failure",
+  "message": "Invalid Client Secret"
+}
+```
+
+```bash
+# Wrong client_id (expect "Invalid Client ID")
+curl -X POST http://localhost:3000/token \
+  -u wrong_client_id:test_client_secret \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials"
+
+# Wrong client_secret only (expect "Invalid Client Secret")
+curl -X POST http://localhost:3000/token \
+  -u test_client_id:wrong_secret \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials"
+
+# Same distinction with credentials in the body
+curl -X POST http://localhost:3000/token/post \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&client_id=test_client_id&client_secret=wrong_secret"
+
+# ...and on a strict endpoint
+curl -X POST http://localhost:3000/oauth2/client-creds/basic/space/token \
+  -u test_client_id:wrong_secret \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&scope=read write"
+```
+
+The `Missing client_id or client_secret` errors are unchanged, and the
+Client Secret JWT method keeps its existing behaviour.
+
+```bash
 # Get Authorization Code
 curl "http://localhost:3000/authorize?response_type=code&client_id=test_client_id&redirect_uri=http://localhost:3000/callback&scope=read%20write&state=xyz"
 
@@ -446,12 +703,14 @@ mock-auth-server/
 │   ├── middleware/
 │   │   ├── errorHandler.js    # Error handling
 │   │   ├── requestLogger.js   # Request logging
+│   │   ├── simulationMiddleware.js # Failure simulation (timeout/delay/error)
 │   │   └── validationEngine.js # Auth validation
 │   ├── routes/
 │   │   ├── apiKeyRoutes.js    # API Key endpoints
 │   │   ├── basicAuthRoutes.js # Basic Auth endpoints
 │   │   ├── oauth1Routes.js    # OAuth1 endpoints
 │   │   ├── oauth2Routes.js    # OAuth2 endpoints
+│   │   ├── oauth2StrictRoutes.js # Strict per-config OAuth2 endpoints
 │   │   ├── protectedRoutes.js # Protected endpoints
 │   │   ├── configRoutes.js    # Config endpoints
 │   │   └── healthRoutes.js    # Health checks
@@ -460,6 +719,8 @@ mock-auth-server/
 │   ├── public/
 │   │   └── index.html         # Test UI
 │   └── utils/
+│       ├── clientCredentials.js # OAuth2 client_id / client_secret checks
+│       ├── oauth1Signature.js   # RFC 5849 signature verification
 │       └── logger.js          # Logging utility
 ├── config/
 │   ├── default.json           # Default configuration
@@ -516,9 +777,23 @@ The server simulates various error scenarios:
 | Missing dynamic params | Warning in response |
 | Invalid PKCE verifier | 400 Bad Request |
 | Expired token | 401 Unauthorized |
+| Unknown OAuth2 `client_id` | 401 - `Invalid Client ID` |
+| Wrong OAuth2 `client_secret` | 401 - `Invalid Client Secret` |
 | Invalid OAuth1 signature | 401 Unauthorized |
+| Wrong OAuth1 consumer key | 401 - `Invalid consumer key` |
+| Wrong OAuth1 consumer secret | 401 - `Invalid Consumer Secret` |
 | Invalid API key | 401 Unauthorized |
 | Expired OAuth1 timestamp | 401 Unauthorized |
+
+Backend failures can be forced on demand — see
+[Failure Simulation](#-failure-simulation):
+
+| Scenario | How |
+|----------|-----|
+| Server never responds (client timeout) | `simulation.mode = "timeout"` or `x-mock-timeout: true` |
+| Slow backend | `simulation.mode = "delay"` or `?_delay=5000` |
+| Backend 500 / 502 / 503 | `simulation.mode = "error"` or `?_status=503` |
+| Connection reset mid-request | `simulation.mode = "timeout"` with `delayMs > 0` |
 
 ## 📝 Response Format
 

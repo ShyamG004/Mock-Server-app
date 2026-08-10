@@ -37,9 +37,16 @@ const healthRoutes = require('./routes/healthRoutes');
 // Import middleware
 const { requestLogger } = require('./middleware/requestLogger');
 const { errorHandler } = require('./middleware/errorHandler');
+const { simulationMiddleware } = require('./middleware/simulationMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Behind a reverse proxy (Render and friends) the TLS terminator forwards the
+// client facing scheme/host in x-forwarded-*. Trusting them keeps req.protocol,
+// req.hostname and req.ip accurate, which matters for redirect URLs and for
+// OAuth1 signature base string reconstruction.
+app.set('trust proxy', true);
 
 // Configure multer for form-data (memory storage, no file uploads)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -96,6 +103,17 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'Mock Auth Server API Docs'
 }));
+
+// =============================================================================
+// FAILURE SIMULATION
+// =============================================================================
+
+// Mounted BEFORE every authentication route so timeouts / forced errors are
+// applied before any credential validation happens.
+// /config, /health, /ui and /api-docs are exempt (see simulationMiddleware),
+// and static assets are already served above, so the server always stays
+// controllable while a failure is being simulated.
+app.use(simulationMiddleware);
 
 // =============================================================================
 // ROUTES

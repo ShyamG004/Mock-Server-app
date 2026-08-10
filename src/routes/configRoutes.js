@@ -16,9 +16,27 @@ const logger = require('../utils/logger');
  *   get:
  *     summary: Get current configuration
  *     tags: [Configuration]
+ *     description: >
+ *       Returns the full configuration, including the `oauth1` behaviour flags and the
+ *       `simulation` block, plus the valid options for each field.
  *     responses:
  *       200:
  *         description: Current server configuration
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                 details:
+ *                   type: object
+ *                   properties:
+ *                     config:
+ *                       $ref: '#/components/schemas/ConfigurationObject'
  */
 router.get('/', (req, res) => {
   res.json({
@@ -35,19 +53,55 @@ router.get('/', (req, res) => {
  * @swagger
  * /config:
  *   post:
- *     summary: Update server configuration
- *     tags: [Configuration]
+ *     summary: Update server configuration (partial deep merge)
+ *     tags: [Configuration, Simulation]
+ *     description: >
+ *       Accepts any subset of the configuration. Two blocks control failure behaviour:
+ *       `oauth1.strictSignature` toggles real OAuth1 signature verification, and
+ *       `simulation` forces timeouts, delays or error statuses on the authentication
+ *       routes. The simulation is never applied to /config, /health, /ui or /api-docs,
+ *       and is cleared by POST /config/reset.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               oauth1:
+ *                 $ref: '#/components/schemas/OAuth1BehaviourConfig'
+ *               simulation:
+ *                 $ref: '#/components/schemas/SimulationConfig'
+ *           examples:
+ *             forceError:
+ *               summary: Force 503 on every auth endpoint
+ *               value:
+ *                 simulation:
+ *                   mode: error
+ *                   errorStatus: 503
+ *                   errorMessage: Simulated internal server error
+ *             hangRequests:
+ *               summary: Hang OAuth2 requests (never respond)
+ *               value:
+ *                 simulation:
+ *                   mode: timeout
+ *                   applyTo: ['/oauth2']
+ *             slowResponses:
+ *               summary: Delay every auth endpoint by 5 seconds
+ *               value:
+ *                 simulation:
+ *                   mode: delay
+ *                   delayMs: 5000
+ *             disableStrictOAuth1:
+ *               summary: Accept any non-empty OAuth1 signature (legacy behaviour)
+ *               value:
+ *                 oauth1:
+ *                   strictSignature: false
  *     responses:
  *       200:
  *         description: Configuration updated successfully
  *       400:
- *         description: Invalid configuration
+ *         description: Invalid configuration (unknown simulation.mode, delayMs out of range, errorStatus outside 400-599, ...)
  */
 router.post('/', (req, res) => {
   const adminKey = req.headers['x-admin-key'];
@@ -136,7 +190,13 @@ router.put('/', (req, res) => {
  * /config/reset:
  *   post:
  *     summary: Reset configuration to defaults
- *     tags: [Configuration]
+ *     tags: [Configuration, Simulation]
+ *     description: >
+ *       Restores every default, which also clears any active failure simulation
+ *       (simulation.mode back to "none") and re-enables oauth1.strictSignature.
+ *     responses:
+ *       200:
+ *         description: Configuration reset to defaults
  */
 router.post('/reset', (req, res) => {
   const adminKey = req.headers['x-admin-key'];

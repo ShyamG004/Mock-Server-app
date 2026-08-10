@@ -51,6 +51,20 @@ const defaultConfig = {
     validateDynamicParams: true,
     strictScopeValidation: true
   },
+  // OAuth1 behaviour flags
+  // strictSignature: true  -> oauth_signature is really verified with HMAC
+  // strictSignature: false -> legacy mock behaviour (any non-empty signature)
+  oauth1: {
+    strictSignature: true
+  },
+  // Failure simulation ("chaos") - see src/middleware/simulationMiddleware.js
+  simulation: {
+    mode: 'none',
+    delayMs: 0,
+    errorStatus: 500,
+    errorMessage: 'Simulated internal server error',
+    applyTo: []
+  },
   dynamicParamDefinitions: [
     { name: 'timestamp', type: 'timestamp', format: 'unix' },
     { name: 'nonce', type: 'nonce', length: 32 },
@@ -66,10 +80,24 @@ const validConfigTypes = ['Auto', 'Manual'];
 const validClientAuthMethods = ['Client Secret Basic', 'Client Secret Post', 'Client Secret JWT', 'None'];
 const validScopeDelimiters = ['comma', 'space', 'plus'];
 const validParamLocations = ['header', 'query', 'body', 'form'];
+const validSimulationModes = ['none', 'timeout', 'error', 'delay'];
+
+// Simulation bounds - kept in sync with src/middleware/simulationMiddleware.js
+const MAX_SIMULATION_DELAY_MS = 300000;
+const MIN_SIMULATION_ERROR_STATUS = 400;
+const MAX_SIMULATION_ERROR_STATUS = 599;
+
+/**
+ * Deep clone plain JSON configuration so nested defaults can never be mutated
+ * by a later update (matters for `simulation` which is reset via /config/reset).
+ */
+function cloneConfig(config) {
+  return JSON.parse(JSON.stringify(config));
+}
 
 class ConfigManager {
   constructor() {
-    this.config = { ...defaultConfig };
+    this.config = cloneConfig(defaultConfig);
     this.configHistory = [];
   }
 
@@ -288,10 +316,83 @@ class ConfigManager {
       errors.push('totalScopes must be between 0 and 100');
     }
 
+    this.validateOAuth1Block(config, errors);
+    this.validateSimulationBlock(config, errors);
+
     return {
       valid: errors.length === 0,
       errors
     };
+  }
+
+  /**
+   * Validate the OAuth1 behaviour flags (accepted at `oauth1` or
+   * `credentials.oauth1` for convenience).
+   */
+  validateOAuth1Block(config, errors) {
+    const blocks = [
+      { label: 'oauth1.strictSignature', value: config.oauth1 },
+      {
+        label: 'credentials.oauth1.strictSignature',
+        value: config.credentials ? config.credentials.oauth1 : undefined
+      }
+    ];
+
+    for (const { label, value } of blocks) {
+      if (!value || typeof value !== 'object') continue;
+      if (value.strictSignature === undefined) continue;
+      if (typeof value.strictSignature !== 'boolean') {
+        errors.push(`${label} must be a boolean`);
+      }
+    }
+  }
+
+  /**
+   * Validate the failure simulation block
+   */
+  validateSimulationBlock(config, errors) {
+    const simulation = config.simulation;
+
+    if (simulation === undefined) return;
+
+    if (simulation === null || typeof simulation !== 'object' || Array.isArray(simulation)) {
+      errors.push('simulation must be an object');
+      return;
+    }
+
+    if (simulation.mode !== undefined && !validSimulationModes.includes(simulation.mode)) {
+      errors.push(`Invalid simulation.mode. Valid values: ${validSimulationModes.join(', ')}`);
+    }
+
+    if (simulation.delayMs !== undefined) {
+      if (!Number.isInteger(simulation.delayMs) ||
+          simulation.delayMs < 0 ||
+          simulation.delayMs > MAX_SIMULATION_DELAY_MS) {
+        errors.push(`simulation.delayMs must be an integer between 0 and ${MAX_SIMULATION_DELAY_MS}`);
+      }
+    }
+
+    if (simulation.errorStatus !== undefined) {
+      if (!Number.isInteger(simulation.errorStatus) ||
+          simulation.errorStatus < MIN_SIMULATION_ERROR_STATUS ||
+          simulation.errorStatus > MAX_SIMULATION_ERROR_STATUS) {
+        errors.push(
+          `simulation.errorStatus must be an integer between ${MIN_SIMULATION_ERROR_STATUS} and ${MAX_SIMULATION_ERROR_STATUS}`
+        );
+      }
+    }
+
+    if (simulation.errorMessage !== undefined && typeof simulation.errorMessage !== 'string') {
+      errors.push('simulation.errorMessage must be a string');
+    }
+
+    if (simulation.applyTo !== undefined) {
+      if (!Array.isArray(simulation.applyTo)) {
+        errors.push('simulation.applyTo must be an array of route prefixes');
+      } else if (simulation.applyTo.some((prefix) => typeof prefix !== 'string' || !prefix.trim())) {
+        errors.push('simulation.applyTo entries must be non-empty strings (e.g. "/oauth2")');
+      }
+    }
   }
 
   /**
@@ -303,8 +404,8 @@ class ConfigManager {
       previousConfig: { ...this.config }
     });
 
-    this.config = { ...defaultConfig };
-    logger.info('Configuration reset to defaults');
+    this.config = cloneConfig(defaultConfig);
+    logger.info('Configuration reset to defaults (including failure simulation)');
 
     return this.getConfig();
   }
@@ -326,7 +427,18 @@ class ConfigManager {
       configurationTypes: validConfigTypes,
       clientAuthMethods: validClientAuthMethods,
       scopeDelimiters: validScopeDelimiters,
-      paramLocations: validParamLocations
+      paramLocations: validParamLocations,
+      simulationModes: validSimulationModes,
+      simulationLimits: {
+        maxDelayMs: MAX_SIMULATION_DELAY_MS,
+        minErrorStatus: MIN_SIMULATION_ERROR_STATUS,
+        maxErrorStatus: MAX_SIMULATION_ERROR_STATUS
+      },
+      perRequestOverrides: {
+        delayQueryParam: '_delay',
+        statusQueryParam: '_status',
+        timeoutHeader: 'x-mock-timeout'
+      }
     };
   }
 

@@ -18,6 +18,7 @@ const express = require('express');
 const router = express.Router();
 const configManager = require('../config/configManager');
 const logger = require('../utils/logger');
+const { checkClientCredentials } = require('../utils/clientCredentials');
 
 // In-memory token store (shared)
 const tokenStore = {
@@ -816,8 +817,10 @@ function validateBasicAuth(req) {
     const decoded = Buffer.from(base64, 'base64').toString('utf8');
     const [clientId, clientSecret] = decoded.split(':');
 
-    if (clientId !== oauth2Config.clientId || clientSecret !== oauth2Config.clientSecret) {
-      return { valid: false, error: 'Invalid client credentials' };
+    // client_id first, then client_secret - distinct errors
+    const credentialError = checkClientCredentials(clientId, clientSecret, oauth2Config);
+    if (credentialError) {
+      return { ...credentialError, method: 'client_secret_basic' };
     }
 
     return { valid: true, clientId, method: 'client_secret_basic' };
@@ -845,8 +848,10 @@ function validatePostAuth(req) {
     return { valid: false, error: 'Missing client_id or client_secret in request body' };
   }
 
-  if (client_id !== oauth2Config.clientId || client_secret !== oauth2Config.clientSecret) {
-    return { valid: false, error: 'Invalid client credentials' };
+  // client_id first, then client_secret - distinct errors
+  const credentialError = checkClientCredentials(client_id, client_secret, oauth2Config);
+  if (credentialError) {
+    return { ...credentialError, method: 'client_secret_post' };
   }
 
   return { valid: true, clientId: client_id, method: 'client_secret_post' };
@@ -1173,7 +1178,7 @@ function createTokenEndpoint(clientAuthMethod, scopeDelimiter, requirePKCE = fal
     }
 
     if (!clientAuth.valid) {
-      return res.status(401).json({
+      const errorBody = {
         status: 'failure',
         message: clientAuth.error,
         details: {
@@ -1181,7 +1186,16 @@ function createTokenEndpoint(clientAuthMethod, scopeDelimiter, requirePKCE = fal
           expectedAuthMethod: clientAuthMethod,
           hint: getAuthMethodHint(clientAuthMethod)
         }
-      });
+      };
+
+      // Distinct "Invalid Client ID" / "Invalid Client Secret" failures also
+      // carry the standard OAuth2 error fields.
+      if (clientAuth.oauthError) {
+        errorBody.error = clientAuth.oauthError;
+        errorBody.error_description = clientAuth.error;
+      }
+
+      return res.status(401).json(errorBody);
     }
 
     // STRICT: Validate scope delimiter if scope provided
@@ -1455,6 +1469,45 @@ function getAuthMethodHint(method) {
 // =============================================================================
 // REGISTER ALL ENDPOINTS
 // =============================================================================
+
+/**
+ * @swagger
+ * /oauth2/client-creds/basic/space/token:
+ *   post:
+ *     summary: Strict token endpoint - representative of the whole strict matrix
+ *     tags: [OAuth2]
+ *     description: >
+ *       One endpoint exists per grant type / client auth method / scope delimiter combination:
+ *       `/oauth2/{auth-code|auth-code-pkce|client-creds}/{basic|post|jwt|none}/{comma|space|plus}/token`.
+ *       Every variant validates the client_id before the client_secret, so an unknown client
+ *       answers "Invalid Client ID" and a known client with a bad secret answers
+ *       "Invalid Client Secret". Call GET /oauth2/endpoints for the full list.
+ *     parameters:
+ *       - $ref: '#/components/parameters/SimulateDelay'
+ *       - $ref: '#/components/parameters/SimulateStatus'
+ *       - $ref: '#/components/parameters/SimulateTimeoutHeader'
+ *     responses:
+ *       200:
+ *         description: Access token issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TokenResponse'
+ *       401:
+ *         description: >
+ *           Client authentication failed. Credential mismatches additionally carry the standard
+ *           OAuth2 `error` / `error_description` fields.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuth2ClientErrorResponse'
+ *       503:
+ *         description: Failure simulation active (simulation.mode = "error")
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SimulatedFailureResponse'
+ */
 
 // Scope delimiters
 const delimiters = ['comma', 'space', 'plus'];

@@ -43,6 +43,28 @@ validation:
   validateDynamicParams: true
   strictScopeValidation: true
 
+# OAuth1 behaviour
+#   strictSignature: true  -> oauth_signature is really verified against
+#                             consumerSecret (HMAC-SHA1/HMAC-SHA256/PLAINTEXT);
+#                             a mismatch answers 401 "Invalid Consumer Secret"
+#   strictSignature: false -> legacy mock behaviour: any non-empty signature passes
+oauth1:
+  strictSignature: true
+
+# Failure simulation ("chaos")
+#   mode:         none | timeout | error | delay
+#   delayMs:      0-300000, used by delay (and by timeout to destroy the socket)
+#   errorStatus:  400-599, used by error
+#   errorMessage: body message returned by error
+#   applyTo:      route prefixes to affect; empty = all non-control routes
+# /config, /health, /ui and /api-docs are never simulated.
+simulation:
+  mode: none
+  delayMs: 0
+  errorStatus: 500
+  errorMessage: Simulated internal server error
+  applyTo: []
+
 # Dynamic Parameter Definitions
 dynamicParamDefinitions:
   - name: timestamp

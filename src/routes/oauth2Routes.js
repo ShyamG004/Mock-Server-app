@@ -13,6 +13,7 @@ const router = express.Router();
 const configManager = require('../config/configManager');
 const logger = require('../utils/logger');
 const crypto = require('crypto-js');
+const { checkClientCredentials } = require('../utils/clientCredentials');
 
 // In-memory token store
 const tokenStore = {
@@ -194,6 +195,26 @@ router.get('/authorize', (req, res) => {
  *     tags: [OAuth2]
  *     security:
  *       - basicAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/SimulateDelay'
+ *       - $ref: '#/components/parameters/SimulateStatus'
+ *       - $ref: '#/components/parameters/SimulateTimeoutHeader'
+ *     responses:
+ *       200:
+ *         description: Access token issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TokenResponse'
+ *       401:
+ *         description: >
+ *           Client authentication failed. The client_id is checked before the client_secret,
+ *           so an unknown client answers "Invalid Client ID" and a known client with a bad
+ *           secret answers "Invalid Client Secret".
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuth2ClientErrorResponse'
  */
 router.post('/token/basic', (req, res) => {
   const config = configManager.getConfig();
@@ -237,6 +258,25 @@ router.post('/token/basic', (req, res) => {
  *   post:
  *     summary: Token endpoint - Client Secret Post (credentials in body only)
  *     tags: [OAuth2]
+ *     parameters:
+ *       - $ref: '#/components/parameters/SimulateDelay'
+ *       - $ref: '#/components/parameters/SimulateStatus'
+ *       - $ref: '#/components/parameters/SimulateTimeoutHeader'
+ *     responses:
+ *       200:
+ *         description: Access token issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TokenResponse'
+ *       401:
+ *         description: >
+ *           Client authentication failed - "Invalid Client ID" when client_id is unknown,
+ *           "Invalid Client Secret" when only the secret is wrong.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuth2ClientErrorResponse'
  */
 router.post('/token/post', (req, res) => {
   const config = configManager.getConfig();
@@ -444,7 +484,36 @@ router.post('/token/pkce', (req, res) => {
  *   post:
  *     summary: Generic Token endpoint - Auto-detects authentication method
  *     tags: [OAuth2]
- *     description: Accepts any client authentication method (for backward compatibility)
+ *     description: >
+ *       Accepts any client authentication method (Client Secret Basic, Client Secret Post,
+ *       Client Secret JWT or none). Supports the authorization_code, client_credentials
+ *       and refresh_token grants. For Basic and Post the client_id is validated before the
+ *       client_secret, producing distinct 401 errors.
+ *     parameters:
+ *       - $ref: '#/components/parameters/SimulateDelay'
+ *       - $ref: '#/components/parameters/SimulateStatus'
+ *       - $ref: '#/components/parameters/SimulateTimeoutHeader'
+ *     responses:
+ *       200:
+ *         description: Access token issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TokenResponse'
+ *       401:
+ *         description: >
+ *           Client authentication failed - "Invalid Client ID" when client_id is unknown,
+ *           "Invalid Client Secret" when only the secret is wrong.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuth2ClientErrorResponse'
+ *       503:
+ *         description: Failure simulation active (simulation.mode = "error")
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SimulatedFailureResponse'
  */
 router.post('/token', (req, res) => {
   const config = configManager.getConfig();
@@ -851,8 +920,10 @@ function validateBasicAuth(req, config) {
     const decoded = Buffer.from(base64, 'base64').toString('utf8');
     const [clientId, clientSecret] = decoded.split(':');
 
-    if (clientId !== oauth2Config.clientId || clientSecret !== oauth2Config.clientSecret) {
-      return { valid: false, error: 'Invalid client credentials' };
+    // client_id first, then client_secret - distinct errors
+    const credentialError = checkClientCredentials(clientId, clientSecret, oauth2Config);
+    if (credentialError) {
+      return { ...credentialError, method: 'Client Secret Basic' };
     }
 
     return { valid: true, clientId, method: 'Client Secret Basic' };
@@ -872,8 +943,10 @@ function validatePostAuth(req, config) {
     return { valid: false, error: 'Missing client_id or client_secret in body' };
   }
 
-  if (client_id !== oauth2Config.clientId || client_secret !== oauth2Config.clientSecret) {
-    return { valid: false, error: 'Invalid client credentials' };
+  // client_id first, then client_secret - distinct errors
+  const credentialError = checkClientCredentials(client_id, client_secret, oauth2Config);
+  if (credentialError) {
+    return { ...credentialError, method: 'Client Secret Post' };
   }
 
   return { valid: true, clientId: client_id, method: 'Client Secret Post' };
@@ -947,8 +1020,10 @@ function validateClientAuthentication(req, config) {
       const decoded = Buffer.from(base64, 'base64').toString('utf8');
       const [headerClientId, headerClientSecret] = decoded.split(':');
 
-      if (headerClientId !== oauth2Config.clientId || headerClientSecret !== oauth2Config.clientSecret) {
-        return { valid: false, error: 'Invalid client credentials', method: 'Client Secret Basic' };
+      // client_id first, then client_secret - distinct errors
+      const credentialError = checkClientCredentials(headerClientId, headerClientSecret, oauth2Config);
+      if (credentialError) {
+        return { ...credentialError, method: 'Client Secret Basic' };
       }
 
       return { valid: true, clientId: headerClientId, method: 'Client Secret Basic' };
@@ -983,8 +1058,10 @@ function validateClientAuthentication(req, config) {
 
   // 3. Check for Client Secret Post (credentials in body)
   if (client_id && client_secret) {
-    if (client_id !== oauth2Config.clientId || client_secret !== oauth2Config.clientSecret) {
-      return { valid: false, error: 'Invalid client credentials', method: 'Client Secret Post' };
+    // client_id first, then client_secret - distinct errors
+    const credentialError = checkClientCredentials(client_id, client_secret, oauth2Config);
+    if (credentialError) {
+      return { ...credentialError, method: 'Client Secret Post' };
     }
 
     return { valid: true, clientId: client_id, method: 'Client Secret Post' };

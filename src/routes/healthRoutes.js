@@ -14,6 +14,9 @@ const configManager = require('../config/configManager');
  *   get:
  *     summary: Health check endpoint
  *     tags: [Health]
+ *     description: >
+ *       Never affected by the failure simulation - /health, /config, /ui and /api-docs stay
+ *       reachable while timeouts or forced errors are active on the authentication routes.
  *     responses:
  *       200:
  *         description: Server is healthy

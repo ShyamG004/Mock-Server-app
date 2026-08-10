@@ -475,13 +475,16 @@
                 <!-- OAuth1 Panel -->
                 <div class="test-panel" id="oauth1-panel">
                     <div class="info-box">
-                        Test OAuth 1.0 authentication flow. Consumer key: <code>mock_consumer_key</code>
+                        Test OAuth 1.0 authentication flow. Consumer key: <code>mock_consumer_key</code>.
+                        Requests are signed for real (HMAC-SHA1), so editing the consumer secret below
+                        makes the server answer <code>Invalid Consumer Secret</code>.
                     </div>
 
                     <div class="quick-test">
                         <button onclick="testOAuth1RequestToken()">Get Request Token</button>
                         <button onclick="testOAuth1ValidSignature()">Test Valid Signature</button>
-                        <button onclick="testOAuth1InvalidSignature()">Test Invalid Signature</button>
+                        <button onclick="testOAuth1InvalidSignature()">Test Invalid Consumer Key</button>
+                        <button onclick="testOAuth1InvalidConsumerSecret()">Test Invalid Consumer Secret</button>
                     </div>
 
                     <div class="form-group">
@@ -730,15 +733,97 @@
 
         // =====================================================================
         // OAuth1 Tests
+        //
+        // Signatures are computed for real (RFC 5849, HMAC-SHA1 via Web Crypto)
+        // so the server can verify the consumer secret. Web Crypto needs a
+        // secure context - https or http://localhost.
         // =====================================================================
+
+        function oauth1PercentEncode(value) {
+            return encodeURIComponent(String(value)).replace(/[!'()*]/g, function (c) {
+                return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+            });
+        }
+
+        function oauth1BaseUrl(path) {
+            const protocol = window.location.protocol.replace(':', '').toLowerCase();
+            let host = window.location.host.toLowerCase();
+
+            if (protocol === 'http' && host.endsWith(':80')) host = host.slice(0, -3);
+            if (protocol === 'https' && host.endsWith(':443')) host = host.slice(0, -4);
+
+            return protocol + '://' + host + path;
+        }
+
+        async function oauth1Signature(method, path, params, consumerSecret, tokenSecret) {
+            const normalized = Object.keys(params)
+                .map(function (key) { return [oauth1PercentEncode(key), oauth1PercentEncode(params[key])]; })
+                .sort(function (a, b) {
+                    if (a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
+                    if (a[1] !== b[1]) return a[1] < b[1] ? -1 : 1;
+                    return 0;
+                })
+                .map(function (pair) { return pair[0] + '=' + pair[1]; })
+                .join('&');
+
+            const baseString = method.toUpperCase() + '&' +
+                oauth1PercentEncode(oauth1BaseUrl(path)) + '&' +
+                oauth1PercentEncode(normalized);
+
+            const signingKey = oauth1PercentEncode(consumerSecret || '') + '&' +
+                oauth1PercentEncode(tokenSecret || '');
+
+            if (!window.crypto || !window.crypto.subtle) {
+                console.warn('Web Crypto unavailable (needs https or localhost) - sending an unsigned placeholder. ' +
+                    'Set { "oauth1": { "strictSignature": false } } via POST /config to accept it.');
+                return 'unsigned_no_webcrypto';
+            }
+
+            const encoder = new TextEncoder();
+            const key = await window.crypto.subtle.importKey(
+                'raw', encoder.encode(signingKey), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+            );
+            const signatureBuffer = await window.crypto.subtle.sign('HMAC', key, encoder.encode(baseString));
+
+            const bytes = new Uint8Array(signatureBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+
+            return btoa(binary);
+        }
+
+        async function buildOAuth1Header(method, path, overrides) {
+            overrides = overrides || {};
+
+            const consumerKeyField = document.getElementById('oauth1ConsumerKey');
+            const consumerSecretField = document.getElementById('oauth1ConsumerSecret');
+
+            const consumerKey = overrides.consumerKey !== undefined
+                ? overrides.consumerKey
+                : ((consumerKeyField && consumerKeyField.value) || 'mock_consumer_key');
+
+            const consumerSecret = overrides.consumerSecret !== undefined
+                ? overrides.consumerSecret
+                : ((consumerSecretField && consumerSecretField.value) || 'mock_consumer_secret');
+
+            const params = {
+                oauth_consumer_key: consumerKey,
+                oauth_nonce: generateNonce(),
+                oauth_signature_method: 'HMAC-SHA1',
+                oauth_timestamp: String(Math.floor(Date.now() / 1000)),
+                oauth_version: '1.0'
+            };
+
+            params.oauth_signature = await oauth1Signature(method, path, params, consumerSecret, '');
+
+            return 'OAuth ' + Object.keys(params).map(function (key) {
+                return key + '="' + oauth1PercentEncode(params[key]) + '"';
+            }).join(', ');
+        }
 
         async function testOAuth1RequestToken() {
             console.log('Testing OAuth1 Request Token');
-            const consumerKey = document.getElementById('oauth1ConsumerKey').value || 'mock_consumer_key';
-            const timestamp = Math.floor(Date.now() / 1000);
-            const nonce = generateNonce();
-
-            const authHeader = 'OAuth oauth_consumer_key="' + consumerKey + '", oauth_nonce="' + nonce + '", oauth_timestamp="' + timestamp + '", oauth_signature_method="HMAC-SHA1", oauth_signature="mock_signature_abc123", oauth_version="1.0"';
+            const authHeader = await buildOAuth1Header('POST', '/oauth1/request-token');
 
             await sendRequest('/oauth1/request-token', {
                 method: 'POST',
@@ -748,11 +833,7 @@
 
         async function testOAuth1ValidSignature() {
             console.log('Testing OAuth1 Valid Signature');
-            const consumerKey = document.getElementById('oauth1ConsumerKey').value || 'mock_consumer_key';
-            const timestamp = Math.floor(Date.now() / 1000);
-            const nonce = generateNonce();
-
-            const authHeader = 'OAuth oauth_consumer_key="' + consumerKey + '", oauth_nonce="' + nonce + '", oauth_timestamp="' + timestamp + '", oauth_signature_method="HMAC-SHA1", oauth_signature="valid_signature_123", oauth_version="1.0"';
+            const authHeader = await buildOAuth1Header('POST', '/oauth1/test');
 
             await sendRequest('/oauth1/test', {
                 method: 'POST',
@@ -761,9 +842,18 @@
         }
 
         async function testOAuth1InvalidSignature() {
-            console.log('Testing OAuth1 Invalid Signature');
-            const timestamp = Math.floor(Date.now() / 1000);
-            const authHeader = 'OAuth oauth_consumer_key="wrong_key", oauth_nonce="abc12345678", oauth_timestamp="' + timestamp + '", oauth_signature_method="HMAC-SHA1", oauth_signature="bad_sig", oauth_version="1.0"';
+            console.log('Testing OAuth1 Invalid Consumer Key');
+            const authHeader = await buildOAuth1Header('POST', '/oauth1/test', { consumerKey: 'wrong_key' });
+
+            await sendRequest('/oauth1/test', {
+                method: 'POST',
+                headers: { 'Authorization': authHeader }
+            });
+        }
+
+        async function testOAuth1InvalidConsumerSecret() {
+            console.log('Testing OAuth1 Invalid Consumer Secret');
+            const authHeader = await buildOAuth1Header('POST', '/oauth1/test', { consumerSecret: 'definitely_wrong_secret' });
 
             await sendRequest('/oauth1/test', {
                 method: 'POST',
@@ -895,10 +985,7 @@
                     const password = document.getElementById('basicPassword').value || 'testpass123';
                     options.headers['Authorization'] = 'Basic ' + btoa(username + ':' + password);
                 } else if (authType === 'OAuth1') {
-                    const timestamp = Math.floor(Date.now() / 1000);
-                    const nonce = generateNonce();
-                    const consumerKey = document.getElementById('oauth1ConsumerKey').value || 'mock_consumer_key';
-                    options.headers['Authorization'] = 'OAuth oauth_consumer_key="' + consumerKey + '", oauth_nonce="' + nonce + '", oauth_timestamp="' + timestamp + '", oauth_signature_method="HMAC-SHA1", oauth_signature="mock_sig", oauth_version="1.0"';
+                    options.headers['Authorization'] = await buildOAuth1Header('GET', '/protected');
                 } else if (authType === 'OAuth2') {
                     let token = document.getElementById('protectedToken').value;
 

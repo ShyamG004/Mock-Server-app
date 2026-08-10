@@ -41,6 +41,16 @@
     "validateDynamicParams": true,
     "strictScopeValidation": true
   },
+  "oauth1": {
+    "strictSignature": true
+  },
+  "simulation": {
+    "mode": "none",
+    "delayMs": 0,
+    "errorStatus": 500,
+    "errorMessage": "Simulated internal server error",
+    "applyTo": []
+  },
   "dynamicParamDefinitions": [
     {
       "name": "timestamp",

@@ -17,6 +17,12 @@ const router = express.Router();
 const configManager = require('../config/configManager');
 const logger = require('../utils/logger');
 const crypto = require('crypto-js');
+const {
+  parseOAuth1Header: parseOAuth1AuthorizationHeader,
+  verifyOAuth1Signature,
+  isStrictSignatureEnabled,
+  SUPPORTED_SIGNATURE_METHODS
+} = require('../utils/oauth1Signature');
 
 // In-memory token store
 const tokenStore = {
@@ -34,9 +40,28 @@ const tokenStore = {
  *   post:
  *     summary: Get OAuth1 request token
  *     tags: [OAuth1]
+ *     description: >
+ *       Requires `Authorization: OAuth ...`. When `oauth1.strictSignature` is true (default)
+ *       the `oauth_signature` is verified against the configured consumer secret using
+ *       RFC 5849 (HMAC-SHA1, HMAC-SHA256 or PLAINTEXT). At this step the token secret is
+ *       empty, so the signing key is `consumerSecret&`.
+ *     parameters:
+ *       - $ref: '#/components/parameters/SimulateDelay'
+ *       - $ref: '#/components/parameters/SimulateStatus'
+ *       - $ref: '#/components/parameters/SimulateTimeoutHeader'
  *     responses:
  *       200:
- *         description: Request token issued
+ *         description: Request token issued (application/x-www-form-urlencoded)
+ *       401:
+ *         description: >
+ *           Signature verification failed. A wrong `oauth_consumer_key` is reported first as
+ *           "OAuth1 signature validation failed" with `Invalid consumer key` in details.errors;
+ *           a correct key with a signature that does not match the consumer secret answers
+ *           "Invalid Consumer Secret".
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuth1SignatureErrorResponse'
  */
 router.post('/request-token', validateOAuth1Signature, (req, res) => {
   const requestToken = generateToken('rt');
@@ -319,6 +344,23 @@ router.post('/authorize/login', (req, res) => {
  *   post:
  *     summary: Exchange request token for access token
  *     tags: [OAuth1]
+ *     description: >
+ *       Signed with `consumerSecret&requestTokenSecret` - the request token secret handed
+ *       out by /oauth1/request-token. A signature that does not match answers 401
+ *       "Invalid Consumer Secret".
+ *     parameters:
+ *       - $ref: '#/components/parameters/SimulateDelay'
+ *       - $ref: '#/components/parameters/SimulateStatus'
+ *       - $ref: '#/components/parameters/SimulateTimeoutHeader'
+ *     responses:
+ *       200:
+ *         description: Access token issued (application/x-www-form-urlencoded)
+ *       401:
+ *         description: Signature verification failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuth1SignatureErrorResponse'
  */
 router.post('/access-token', validateOAuth1Signature, (req, res) => {
   const oauthParams = req.oauth1Params;
@@ -414,6 +456,36 @@ router.get('/test', validateOAuth1Signature, validateAccessToken, (req, res) => 
  *   post:
  *     summary: Test OAuth1 authentication with body
  *     tags: [OAuth1]
+ *     description: >
+ *       Verifies the OAuth1 signature against the configured consumer secret.
+ *       Behind a reverse proxy the signature base URL is rebuilt from
+ *       `x-forwarded-proto` / `x-forwarded-host`.
+ *     parameters:
+ *       - $ref: '#/components/parameters/SimulateDelay'
+ *       - $ref: '#/components/parameters/SimulateStatus'
+ *       - $ref: '#/components/parameters/SimulateTimeoutHeader'
+ *     responses:
+ *       200:
+ *         description: OAuth1 authentication successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       401:
+ *         description: >
+ *           "Invalid Consumer Secret" when the signature does not match, or
+ *           "OAuth1 signature validation failed" (with `Invalid consumer key` in
+ *           details.errors) when the consumer key itself is wrong.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuth1SignatureErrorResponse'
+ *       503:
+ *         description: Failure simulation active (simulation.mode = "error")
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SimulatedFailureResponse'
  */
 router.post('/test', validateOAuth1Signature, (req, res) => {
   const config = configManager.getConfig();
@@ -534,7 +606,9 @@ function validateOAuth1Signature(req, res, next) {
     }
   }
 
-  // Validate consumer key
+  // Validate consumer key.
+  // NOTE: this is checked BEFORE the signature so a wrong consumer key is never
+  // reported as a consumer-secret problem.
   if (oauthParams.oauth_consumer_key && oauthParams.oauth_consumer_key !== oauth1Config.consumerKey) {
     errors.push('Invalid consumer key');
   }
@@ -550,16 +624,18 @@ function validateOAuth1Signature(req, res, next) {
   }
 
   // Validate signature method
-  const validMethods = ['HMAC-SHA1', 'HMAC-SHA256', 'PLAINTEXT'];
+  const validMethods = SUPPORTED_SIGNATURE_METHODS;
   if (oauthParams.oauth_signature_method && !validMethods.includes(oauthParams.oauth_signature_method)) {
     errors.push(`Invalid signature method. Valid: ${validMethods.join(', ')}`);
   }
 
-  // Mock signature validation (accept any non-empty signature)
+  // A signature must at least be present
   if (!oauthParams.oauth_signature || oauthParams.oauth_signature.length === 0) {
     errors.push('Invalid signature');
   }
 
+  // Any of the above (including a wrong consumer key) short-circuits here, so
+  // the consumer-key error always wins over the consumer-secret error.
   if (errors.length > 0) {
     return res.status(401).json({
       status: 'failure',
@@ -571,8 +647,75 @@ function validateOAuth1Signature(req, res, next) {
     });
   }
 
+  // Real signature verification - proves the client holds the consumer secret.
+  // Disable with { "oauth1": { "strictSignature": false } } via POST /config to
+  // fall back to the legacy mock behaviour (any non-empty signature accepted).
+  if (isStrictSignatureEnabled(config)) {
+    const signatureResult = verifyOAuth1Signature(req, oauthParams, {
+      consumerSecret: oauth1Config.consumerSecret,
+      tokenSecrets: resolveTokenSecrets(oauthParams.oauth_token, oauth1Config)
+    });
+
+    if (!signatureResult.valid) {
+      logger.warn('OAuth1 signature mismatch - invalid consumer secret', {
+        requestId: req.requestId,
+        path: req.path,
+        method: req.method,
+        signatureMethod: signatureResult.signatureMethod,
+        consumerKey: oauthParams.oauth_consumer_key
+      });
+
+      return res.status(401).json({
+        status: 'failure',
+        message: 'Invalid Consumer Secret',
+        details: {
+          error: 'Invalid Consumer Secret',
+          signatureMethod: signatureResult.signatureMethod,
+          providedSignature: oauthParams.oauth_signature,
+          expectedSignature: signatureResult.expectedSignature,
+          signatureBaseString: signatureResult.baseString,
+          signatureBaseUrl: signatureResult.baseUrl,
+          hint: 'The oauth_signature does not match the configured consumer secret. Set { "oauth1": { "strictSignature": false } } via POST /config to accept any non-empty signature.'
+        }
+      });
+    }
+
+    req.oauth1SignatureResult = signatureResult;
+  }
+
   req.oauth1Params = oauthParams;
   next();
+}
+
+/**
+ * Candidate token secrets for signature verification.
+ *
+ * OAuth1 signs with `consumerSecret & tokenSecret`. The token secret depends on
+ * the step of the flow, so every plausible secret is offered and the signature
+ * is accepted if any of them matches. The empty secret (request-token step /
+ * two-legged OAuth) is appended by the verifier itself.
+ */
+function resolveTokenSecrets(oauthToken, oauth1Config) {
+  const secrets = [];
+
+  if (oauthToken) {
+    const requestTokenData = tokenStore.requestTokens.get(oauthToken);
+    if (requestTokenData && requestTokenData.secret) {
+      secrets.push(requestTokenData.secret);
+    }
+
+    const accessTokenData = tokenStore.accessTokens.get(oauthToken);
+    if (accessTokenData && accessTokenData.secret) {
+      secrets.push(accessTokenData.secret);
+    }
+  }
+
+  // Statically configured token secret (config.credentials.oauth1.tokenSecret)
+  if (oauth1Config.tokenSecret) {
+    secrets.push(oauth1Config.tokenSecret);
+  }
+
+  return secrets;
 }
 
 /**
@@ -605,35 +748,12 @@ function validateAccessToken(req, res, next) {
 
 /**
  * Parse OAuth1 Authorization header
+ *
+ * Delegates to the shared RFC 5849 parser (splits on the first '=' so base64
+ * signatures keep their padding, then percent-decodes the value).
  */
 function parseOAuth1Header(header) {
-  const params = {};
-
-  if (!header || !header.startsWith('OAuth ')) {
-    return params;
-  }
-
-  const oauthPart = header.replace('OAuth ', '');
-  const pairs = oauthPart.split(',').map(p => p.trim());
-
-  for (const pair of pairs) {
-    const eqIndex = pair.indexOf('=');
-    if (eqIndex > 0) {
-      const key = pair.substring(0, eqIndex).trim();
-      let value = pair.substring(eqIndex + 1).trim();
-      // Remove surrounding quotes
-      value = value.replace(/^["']|["']$/g, '');
-      // URL decode
-      try {
-        value = decodeURIComponent(value);
-      } catch (e) {
-        // Keep original value if decode fails
-      }
-      params[key] = value;
-    }
-  }
-
-  return params;
+  return parseOAuth1AuthorizationHeader(header);
 }
 
 /**

@@ -15,6 +15,12 @@
 const configManager = require('../config/configManager');
 const logger = require('../utils/logger');
 const { AuthenticationError, ValidationError } = require('./errorHandler');
+const { checkClientCredentials } = require('../utils/clientCredentials');
+const {
+  parseOAuth1Header: parseOAuth1AuthorizationHeader,
+  verifyOAuth1Signature,
+  isStrictSignatureEnabled
+} = require('../utils/oauth1Signature');
 
 /**
  * Main validation engine middleware
@@ -184,8 +190,10 @@ function validateOAuth1(req, config, result) {
     }
   }
 
-  // Validate consumer key
-  if (oauthParams.oauth_consumer_key !== oauth1Config.consumerKey) {
+  // Validate consumer key FIRST - a wrong key must never be reported as a
+  // signature (consumer secret) problem.
+  const consumerKeyValid = oauthParams.oauth_consumer_key === oauth1Config.consumerKey;
+  if (!consumerKeyValid) {
     result.errors.push('Invalid consumer key');
     result.valid = false;
   }
@@ -204,32 +212,42 @@ function validateOAuth1(req, config, result) {
     result.valid = false;
   }
 
-  // Mock signature validation (always valid if format is correct)
-  if (oauthParams.oauth_signature && oauthParams.oauth_signature.length > 0) {
-    result.validatedParams++;
-    result.dynamicParams += 3; // nonce, timestamp, signature
-  } else {
+  // Signature validation
+  if (!oauthParams.oauth_signature || oauthParams.oauth_signature.length === 0) {
     result.errors.push('Invalid OAuth1 signature');
+    result.valid = false;
+    return;
+  }
+
+  result.validatedParams++;
+  result.dynamicParams += 3; // nonce, timestamp, signature
+
+  // Real HMAC verification only makes sense once the consumer key is known and
+  // the rest of the protocol parameters are sound - otherwise a wrong consumer
+  // key (or a stale timestamp) would also be reported as a secret mismatch.
+  if (!consumerKeyValid || !result.valid || !isStrictSignatureEnabled(config)) {
+    return;
+  }
+
+  const signatureResult = verifyOAuth1Signature(req, oauthParams, {
+    consumerSecret: oauth1Config.consumerSecret,
+    tokenSecrets: [oauth1Config.tokenSecret]
+  });
+
+  if (!signatureResult.valid) {
+    result.errors.push('Invalid Consumer Secret');
     result.valid = false;
   }
 }
 
 /**
  * Parse OAuth1 Authorization header
+ *
+ * Delegates to the shared parser so base64 signatures keep their '=' padding
+ * and percent-encoded values are decoded.
  */
 function parseOAuth1Header(header) {
-  const params = {};
-  const oauthPart = header.replace('OAuth ', '');
-
-  const pairs = oauthPart.split(',').map(p => p.trim());
-  for (const pair of pairs) {
-    const [key, value] = pair.split('=');
-    if (key && value) {
-      params[key] = value.replace(/"/g, '');
-    }
-  }
-
-  return params;
+  return parseOAuth1AuthorizationHeader(header);
 }
 
 /**
@@ -286,8 +304,10 @@ function validateClientAuth(req, config, result) {
           const decoded = Buffer.from(base64, 'base64').toString('utf8');
           const [clientId, clientSecret] = decoded.split(':');
 
-          if (clientId !== oauth2Config.clientId || clientSecret !== oauth2Config.clientSecret) {
-            result.errors.push('Invalid client credentials');
+          // client_id first, then client_secret - distinct errors
+          const credentialError = checkClientCredentials(clientId, clientSecret, oauth2Config);
+          if (credentialError) {
+            result.errors.push(credentialError.error);
             result.valid = false;
           } else {
             result.validatedParams += 2;
@@ -299,17 +319,23 @@ function validateClientAuth(req, config, result) {
       }
       break;
 
-    case 'Client Secret Post':
+    case 'Client Secret Post': {
       if (!bodyClientId || !bodyClientSecret) {
         result.errors.push('Client Secret Post auth required: client_id and client_secret in body');
         result.valid = false;
-      } else if (bodyClientId !== oauth2Config.clientId || bodyClientSecret !== oauth2Config.clientSecret) {
-        result.errors.push('Invalid client credentials in body');
+        break;
+      }
+
+      // client_id first, then client_secret - distinct errors
+      const postCredentialError = checkClientCredentials(bodyClientId, bodyClientSecret, oauth2Config);
+      if (postCredentialError) {
+        result.errors.push(postCredentialError.error);
         result.valid = false;
       } else {
         result.validatedParams += 2;
       }
       break;
+    }
 
     case 'Client Secret JWT':
       const clientAssertion = req.body.client_assertion;
